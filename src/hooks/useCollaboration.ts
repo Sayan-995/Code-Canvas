@@ -1,0 +1,78 @@
+import { useEffect, useState, useRef } from 'react';
+import * as Y from 'yjs';
+import { WebrtcProvider } from 'y-webrtc';
+import { useFileStore, Drawing } from '../store/useFileStore';
+
+export const useCollaboration = (roomId: string | null) => {
+  const { setDrawings } = useFileStore();
+  const [status, setStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const yArrayRef = useRef<Y.Array<Drawing> | null>(null);
+
+  useEffect(() => {
+    if (!roomId) {
+        setStatus('disconnected');
+        return;
+    }
+
+    const ydoc = new Y.Doc();
+    // Use local signaling server to avoid public server errors
+    const provider = new WebrtcProvider(roomId, ydoc, {
+        signaling: ['ws://localhost:4444']
+    });
+
+    const yDrawings = ydoc.getArray<Drawing>('drawings');
+    yArrayRef.current = yDrawings;
+
+    setStatus('connecting');
+
+    provider.on('status', ({ connected }: { connected: boolean }) => {
+      setStatus(connected ? 'connected' : 'disconnected');
+    });
+
+    yDrawings.observe(() => {
+      setDrawings(yDrawings.toArray());
+    });
+
+    // Initial sync if data exists
+    if (yDrawings.length > 0) {
+        setDrawings(yDrawings.toArray());
+    }
+    
+    return () => {
+      provider.destroy();
+      ydoc.destroy();
+      yArrayRef.current = null;
+    };
+  }, [roomId, setDrawings]);
+
+  const addDrawingToYjs = (drawing: Drawing) => {
+    if (yArrayRef.current) {
+        yArrayRef.current.push([drawing]);
+    }
+  };
+
+  const updateDrawingInYjs = (id: string, updates: Partial<Drawing>) => {
+      if (yArrayRef.current) {
+          const arr = yArrayRef.current.toArray();
+          const index = arr.findIndex(d => d.id === id);
+          if (index !== -1) {
+              const old = arr[index];
+              yArrayRef.current.delete(index, 1);
+              yArrayRef.current.insert(index, [{ ...old, ...updates }]);
+          }
+      }
+  };
+
+  const removeDrawingFromYjs = (id: string) => {
+      if (yArrayRef.current) {
+          const arr = yArrayRef.current.toArray();
+          const index = arr.findIndex(d => d.id === id);
+          if (index !== -1) {
+              yArrayRef.current.delete(index, 1);
+          }
+      }
+  };
+  
+  return { status, addDrawingToYjs, updateDrawingInYjs, removeDrawingFromYjs };
+};
+

@@ -10,6 +10,15 @@ export interface FileStructure {
   lastSyncedContent?: string;
 }
 
+export interface Drawing {
+  id: string;
+  type: 'freehand' | 'rectangle' | 'circle' | 'line' | 'text';
+  points: { x: number; y: number }[];
+  color: string;
+  strokeWidth: number;
+  text?: string;
+}
+
 interface GitHubContext {
   owner: string;
   repo: string;
@@ -20,6 +29,7 @@ interface GitHubContext {
 
 interface FileStore {
   files: FileStructure[];
+  drawings: Drawing[];
   githubContext: GitHubContext | null;
   setFiles: (files: FileStructure[]) => void;
   addFile: (file: FileStructure) => void;
@@ -28,10 +38,15 @@ interface FileStore {
   clearFiles: () => void;
   updateFileAnalysis: (path: string, analysis: FileAnalysis) => void;
   markAllAsSynced: () => void;
+  addDrawing: (drawing: Drawing) => void;
+  updateDrawing: (id: string, updates: Partial<Drawing>) => void;
+  removeDrawing: (id: string) => void;
+  setDrawings: (drawings: Drawing[] | ((prev: Drawing[]) => Drawing[])) => void;
 }
 
 export const useFileStore = create<FileStore>((set) => ({
   files: [],
+  drawings: [],
   githubContext: null,
   setFiles: (files) => set({ files }),
   addFile: (file) => set((state) => ({ files: [...state.files, file] })),
@@ -47,11 +62,23 @@ export const useFileStore = create<FileStore>((set) => ({
     return { files: updatedFiles };
   }),
   setGitHubContext: (context) => set({ githubContext: context }),
-  clearFiles: () => set({ files: [], githubContext: null }),
+  clearFiles: () => set({ files: [], drawings: [], githubContext: null }),
   updateFileAnalysis: (path, analysis) => set((state) => ({
     files: state.files.map((f) => (f.path === path ? { ...f, analysis } : f)),
   })),
   markAllAsSynced: () => set((state) => ({
     files: state.files.map(f => ({ ...f, lastSyncedContent: f.content }))
+  })),
+  addDrawing: (drawing) => set((state) => ({ drawings: [...state.drawings, drawing] })),
+  updateDrawing: (id, updates) => set((state) => ({
+    drawings: state.drawings.map(d => d.id === id ? { ...d, ...updates } : d)
+  })),
+  removeDrawing: (id) => set((state) => ({
+    drawings: state.drawings.filter(d => d.id !== id)
+  })),
+  setDrawings: (drawingsOrUpdater) => set((state) => ({
+    drawings: typeof drawingsOrUpdater === 'function' 
+      ? (drawingsOrUpdater as (prev: Drawing[]) => Drawing[])(state.drawings)
+      : drawingsOrUpdater
   })),
 }));
