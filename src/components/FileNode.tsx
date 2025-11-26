@@ -29,6 +29,7 @@ interface FileNodeData {
   activeFlowLine?: number | null;
   activeFlowFunction?: string | null;
   activeReturnLines?: number[] | null;
+  executedLines?: Set<number>;
 }
 
 const tokenColors: Record<string, string> = {
@@ -563,11 +564,13 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
           ) : (
             <div className="whitespace-pre-wrap break-words">
               {lines.map((line, i) => {
-                const isFlowLine = data.activeFlowLine === i + 1;
-                const isReturnLine = data.activeReturnLines?.includes(i + 1);
+                const lineNumber = i + 1;
+                const isExecuted = data.executedLines?.has(lineNumber);
+                const isFlowLine = data.activeFlowLine === lineNumber;
+                const isReturnLine = data.activeReturnLines?.includes(lineNumber);
                 const isFlowFunc = isLineInHighlightedFunction(i);
                 
-                const endpointOnLine = data.analysis?.endpoints?.find(e => e.line === i + 1);
+                const endpointOnLine = data.analysis?.endpoints?.find(e => e.line === lineNumber);
                 const isEndpointLine = endpointOnLine && (
                     hoveredFunction === endpointOnLine.path || 
                     data.selectedFunction === endpointOnLine.path
@@ -576,21 +579,33 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
                 return (
                 <div 
                   key={i} 
-                  id={`line-${data.path}-${i + 1}`}
-                  className={`relative min-h-[1.2em] leading-relaxed pl-2 transition-colors duration-300 ${
-                    isFlowLine 
-                      ? 'bg-cyan-500/20 border-l-2 border-cyan-400' 
-                      : isReturnLine
-                        ? 'bg-purple-500/20 border-l-2 border-purple-400'
-                        : isEndpointLine
-                          ? 'bg-green-500/10 border-l-2 border-green-500/30'
-                          : isFlowFunc 
-                            ? 'bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
-                            : ''
+                  id={`line-${data.path}-${lineNumber}`}
+                  className={`relative min-h-[1.2em] leading-relaxed pl-2 transition-colors duration-200 ${
+                    isExecuted
+                      ? 'bg-red-500/30 border-l-4 border-red-500 animate-pulse-once'
+                      : isFlowLine 
+                        ? 'bg-cyan-500/20 border-l-2 border-cyan-400' 
+                        : isReturnLine
+                          ? 'bg-purple-500/20 border-l-2 border-purple-400'
+                          : isEndpointLine
+                            ? 'bg-green-500/10 border-l-2 border-green-500/30'
+                            : isFlowFunc 
+                              ? 'bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
+                              : ''
                   }`}
                 >
                   {/* Line Number */}
-                  <span className={`inline-block w-8 select-none text-right mr-4 ${isFlowLine ? 'text-cyan-400 font-bold' : isReturnLine ? 'text-purple-400 font-bold' : isEndpointLine ? 'text-green-400 font-bold' : 'text-[#858585]'}`}>{i + 1}</span>
+                  <span className={`inline-block w-8 select-none text-right mr-4 ${
+                    isExecuted 
+                      ? 'text-red-400 font-bold' 
+                      : isFlowLine 
+                        ? 'text-cyan-400 font-bold' 
+                        : isReturnLine 
+                          ? 'text-purple-400 font-bold' 
+                          : isEndpointLine 
+                            ? 'text-green-400 font-bold' 
+                            : 'text-[#858585]'
+                  }`}>{lineNumber}</span>
                   {/* Code */}
                   {line}
                   {/* Handles for this line */}
