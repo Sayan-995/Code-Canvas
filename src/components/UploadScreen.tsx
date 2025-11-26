@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useFileStore, FileStructure, FileSegment } from '../store/useFileStore';
-import { Github, FolderUp } from 'lucide-react';
+import { useFileStore, FileStructure, FileSegment, ViewMode } from '../store/useFileStore';
+import { Github, FolderUp, Loader2 } from 'lucide-react';
 import { Octokit } from '@octokit/rest';
 import { analyzeCode } from '../utils/codeAnalyzer';
 import { categorizeRepository } from '../services/repoSeparator';
@@ -21,16 +21,25 @@ interface PendingGitHubData {
   octokit: Octokit;
 }
 
+const VIDEO_WATCHED_KEY = 'code_canvas_video_watched';
+
 export const UploadScreen: React.FC = () => {
   const { setFiles, setGitHubContext, setCachedRepoData } = useFileStore();
   const [loading, setLoading] = useState(false);
   const [repoUrl, setRepoUrl] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [error, setError] = useState('');
+<<<<<<< HEAD
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [logs, setLogs] = useState<string[]>([]);
   const terminalRef = React.useRef<HTMLDivElement>(null);
   const [transitionStage, setTransitionStage] = useState<'idle' | 'loading' | 'fading' | 'complete'>('idle');
+=======
+  
+  // Check if user has already watched the video
+  const hasWatchedVideo = () => localStorage.getItem(VIDEO_WATCHED_KEY) === 'true';
+  const [videoEnded, setVideoEnded] = useState(hasWatchedVideo());
+>>>>>>> 7e85a2c7a87ce5608dcc9b2a48237dac803feecf
   
   // Segmentation state
   const [segments, setSegments] = useState<FileSegment[] | null>(null);
@@ -224,7 +233,7 @@ export const UploadScreen: React.FC = () => {
   };
 
 
-  const handleSegmentConfirm = async (selectedFiles: string[], selectedCategories: Set<string>) => {
+  const handleSegmentConfirm = async (selectedFiles: string[], selectedCategories: Set<string>, viewMode: ViewMode) => {
     setIsLoadingSelected(true);
     
     try {
@@ -237,7 +246,8 @@ export const UploadScreen: React.FC = () => {
         setCachedRepoData({
           segments,
           allFiles: analyzed,
-          selectedCategories
+          selectedCategories,
+          viewMode
         });
       } else if (pendingGitHubData && segments) {
         // GitHub - fetch only selected files initially, store tree for lazy loading
@@ -272,6 +282,7 @@ export const UploadScreen: React.FC = () => {
           segments,
           allFiles: analyzed,
           selectedCategories,
+          viewMode,
           pendingTree: pendingTree.map(n => ({ path: n.path, sha: n.sha }))
         });
         setGitHubContext({ owner, repo, branch, token: githubToken, sha });
@@ -295,6 +306,7 @@ export const UploadScreen: React.FC = () => {
 
 
   return (
+<<<<<<< HEAD
     <div 
       className="relative flex flex-col items-center justify-center h-screen bg-black text-white p-4 overflow-hidden"
       onMouseMove={handleMouseMove}
@@ -318,8 +330,63 @@ export const UploadScreen: React.FC = () => {
       {/* Content overlay */}
       <div className={`relative z-10 flex flex-col items-center w-full transition-opacity duration-700 ${transitionStage === 'fading' || transitionStage === 'complete' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <h1 className={`text-5xl font-bold mb-12 transition-all duration-500 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600 ${loading ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
+=======
+    <div className="relative flex flex-col items-center justify-center h-screen text-white p-4 overflow-hidden">
+      {/* Background Video - plays once at normal speed during loading */}
+      {loading && !videoEnded && (
+        <div className="absolute inset-0 flex items-center justify-center z-0 p-6 md:p-12">
+          <video
+            autoPlay
+            muted
+            playsInline
+            onEnded={() => {
+              localStorage.setItem(VIDEO_WATCHED_KEY, 'true');
+              setVideoEnded(true);
+            }}
+            className="rounded-lg shadow-2xl"
+            style={{ 
+              filter: 'brightness(0.9)',
+              maxWidth: 'calc(100% - 48px)',
+              maxHeight: 'calc(100% - 48px)',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain',
+              margin: 'auto'
+            }}
+            onLoadedMetadata={(e) => {
+              const video = e.currentTarget;
+              video.playbackRate = 1.2;
+            }}
+          >
+            <source src="/kiro_bg_2.mp4" type="video/mp4" />
+          </video>
+        </div>
+      )}
+
+      {/* Dark overlay after video ends but still loading */}
+      {loading && videoEnded && (
+        <div className="absolute inset-0 w-full h-full bg-gray-900 z-0" />
+         
+      )}
+
+      {/* Static background when not loading */}
+      {!loading && (
+        <div 
+          className="absolute inset-0 w-full h-full z-0"
+          style={{ 
+            backgroundImage: 'url(/kiro_bg.png)', 
+            backgroundSize: 'cover', 
+            backgroundPosition: 'center' 
+          }}
+        />
+      )}
+
+      {/* Content overlay */}
+      <div className="relative z-10 flex flex-col items-center w-full">
+        {/* <h1 className={`text-4xl font-bold mb-8 transition-all duration-500 ${loading ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
+>>>>>>> 7e85a2c7a87ce5608dcc9b2a48237dac803feecf
           Code Canvas
-        </h1>
+        </h1> */}
         
         <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl transition-all duration-500 ${loading ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
         {/* Local Upload */}
