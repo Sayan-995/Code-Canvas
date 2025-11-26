@@ -32,6 +32,8 @@ interface FileNodeData {
   activeFlowFunction?: string | null;
   activeReturnLines?: number[] | null;
   executedLines?: Set<number>;
+  isHighlighted?: boolean;
+  highlightedFunctions?: string[];
 }
 
 const tokenColors: Record<string, string> = {
@@ -235,12 +237,16 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
     } else if (isFuncDef) {
       const isSelected = data.selectedFunction === trimmedText;
       const isActiveFlow = data.activeFlowFunction === trimmedText;
+      const isSearchHighlighted = data.highlightedFunctions?.includes(trimmedText);
       
       return (
         <span key={key} className="relative inline-block">
           <span 
             style={{ color: isActiveFlow ? '#22d3ee' : (tokenColors['function'] || '#dcdcaa') }}
             className={`cursor-pointer rounded transition-all duration-500 relative z-10 ${
+              isSearchHighlighted
+                ? 'bg-yellow-500/30 ring-2 ring-yellow-500 text-yellow-200 font-bold'
+                :
               (isSelected || hoveredFunction === trimmedText)
                 ? 'bg-blue-500 text-white shadow-[0_0_0_2px_#3b82f6,0_0_10px_rgba(59,130,246,0.8)]' 
                 : isActiveFlow
@@ -532,7 +538,13 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
         title="Drag to resize width"
       />
 
-      <div className="bg-[#1e1e1e] border border-[#333] rounded-lg shadow-xl w-full h-auto overflow-hidden flex flex-row">
+      <div 
+        className={`bg-[#1e1e1e] border rounded-lg w-full h-auto overflow-hidden flex flex-row transition-all duration-500 ${
+          data.isHighlighted 
+            ? 'border-blue-500 shadow-[0_0_40px_rgba(59,130,246,0.9),0_0_80px_rgba(59,130,246,0.5)] ring-4 ring-blue-500/40 animate-pulse-glow' 
+            : 'border-[#333] shadow-xl'
+        }`}
+      >
         <div className="flex-1 flex flex-col min-w-[300px]">
         {/* Header */}
         <div className="bg-[#252526] px-4 py-2 border-b border-[#333] flex items-center justify-between">
@@ -655,6 +667,14 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
                 const isReturnLine = data.activeReturnLines?.includes(lineNumber);
                 const isFlowFunc = isLineInHighlightedFunction(i);
                 
+                // Check if this line is part of a highlighted function body
+                const isInHighlightedFunction = data.highlightedFunctions && data.highlightedFunctions.length > 0 && 
+                  data.analysis?.functions.some(func => 
+                    data.highlightedFunctions?.includes(func.name) &&
+                    lineNumber >= func.startLine &&
+                    lineNumber <= func.endLine
+                  );
+                
                 const endpointOnLine = data.analysis?.endpoints?.find(e => e.line === lineNumber);
                 const isEndpointLine = endpointOnLine && (
                     hoveredFunction === endpointOnLine.path || 
@@ -665,18 +685,20 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
                 <div 
                   key={i} 
                   id={`line-${data.path}-${lineNumber}`}
-                  className={`relative min-h-[1.2em] leading-relaxed pl-2 transition-colors duration-200 ${
-                    isExecuted
-                      ? 'bg-red-500/30 border-l-4 border-red-500 animate-pulse-once'
-                      : isFlowLine 
-                        ? 'bg-cyan-500/20 border-l-2 border-cyan-400' 
-                        : isReturnLine
-                          ? 'bg-purple-500/20 border-l-2 border-purple-400'
-                          : isEndpointLine
-                            ? 'bg-green-500/10 border-l-2 border-green-500/30'
-                            : isFlowFunc 
-                              ? 'bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
-                              : ''
+                  className={`relative min-h-[1.2em] leading-relaxed pl-2 transition-colors duration-300 ${
+                    isInHighlightedFunction
+                      ? 'bg-blue-500/25 border-l-4 border-blue-500'
+                      : isExecuted
+                        ? 'bg-red-500/30 border-l-4 border-red-500 animate-pulse-once'
+                        : isFlowLine 
+                          ? 'bg-cyan-500/20 border-l-2 border-cyan-400' 
+                          : isReturnLine
+                            ? 'bg-purple-500/20 border-l-2 border-purple-400'
+                            : isEndpointLine
+                              ? 'bg-green-500/10 border-l-2 border-green-500/30'
+                              : isFlowFunc 
+                                ? 'bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
+                                : ''
                   }`}
                 >
                   {/* Line Number */}

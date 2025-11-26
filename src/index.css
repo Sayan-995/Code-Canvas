@@ -14,3 +14,17 @@ code[class*="language-"] {
   background: transparent !important;
   text-shadow: none !important;
 }
+
+/* Pulse glow animation for highlighted files */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.9), 0 0 80px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 50px rgba(59, 130, 246, 1), 0 0 100px rgba(59, 130, 246, 0.7);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}

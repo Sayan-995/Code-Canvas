@@ -16,8 +16,9 @@ import { FileStructure, useFileStore, Drawing } from '../store/useFileStore';
 import { FileNode } from './FileNode';
 import { FlowEdge } from './FlowEdge';
 import { DrawingNode } from './DrawingNode';
-import { PenTool, MousePointer2, Eraser, Palette, Circle, Square, Share, Minus, Type, Hand, Link as LinkIcon } from 'lucide-react';
+import { PenTool, MousePointer2, Eraser, Palette, Circle, Square, Share, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCollaboration } from '../hooks/useCollaboration';
+import { CodeSearchEngine } from '../services/searchEngine';
 
 const nodeTypes = {
   fileNode: FileNode,
@@ -75,6 +76,15 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
 
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
+  
+  // Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [highlightedFiles, setHighlightedFiles] = useState<Set<string>>(new Set());
+  const [highlightedFunctions, setHighlightedFunctions] = useState<Map<string, string[]>>(new Map());
+  const [searchMessage, setSearchMessage] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<{type: 'file' | 'function', path: string, functionName?: string, line?: number}>>([]); 
+  const [currentResultIndex, setCurrentResultIndex] = useState(0);
+  const searchEngineRef = useRef<CodeSearchEngine>(new CodeSearchEngine());
   
   useEffect(() => {
       const params = new URLSearchParams(window.location.search);
@@ -756,6 +766,132 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
     return newEdges;
   }, [files]);
 
+  const handleSearch = useCallback(() => {
+    if (!searchQuery.trim()) {
+      setSearchMessage('');
+      setHighlightedFiles(new Set());
+      setHighlightedFunctions(new Map());
+      return;
+    }
+
+    // Search directly with user input (no parsing)
+    const searchTerm = searchQuery.trim().toLowerCase();
+    
+    if (!searchTerm) {
+      setSearchMessage('Please enter a search term');
+      return;
+    }
+
+    // Search for both files and functions by default
+    const results = searchEngineRef.current.search(searchTerm, 'both');
+    
+    const totalResults = results.files.length + results.functions.length;
+    
+    if (totalResults === 0) {
+      setSearchMessage(`No matches found for "${searchTerm}"`);
+      setHighlightedFiles(new Set());
+      setHighlightedFunctions(new Map());
+      setSearchResults([]);
+      return;
+    }
+
+    // Update highlighted files
+    const fileSet = new Set(results.files.map(f => f.path));
+    setHighlightedFiles(fileSet);
+
+    // Update highlighted functions
+    const funcMap = new Map<string, string[]>();
+    results.functions.forEach(func => {
+      if (!funcMap.has(func.file)) {
+        funcMap.set(func.file, []);
+      }
+      funcMap.get(func.file)!.push(func.name);
+    });
+    setHighlightedFunctions(funcMap);
+
+    // Store results for navigation (combine files and functions)
+    const allResults: Array<{type: 'file' | 'function', path: string, functionName?: string, line?: number}> = [];
+    
+    // Add file results
+    results.files.forEach(f => {
+      allResults.push({ type: 'file', path: f.path });
+    });
+    
+    // Add function results
+    results.functions.forEach(func => {
+      allResults.push({ 
+        type: 'function', 
+        path: func.file, 
+        functionName: func.name,
+        line: func.line 
+      });
+    });
+    
+    setSearchResults(allResults);
+    setCurrentResultIndex(0);
+
+    // Set message with count
+    const fileCount = results.files.length;
+    const funcCount = results.functions.length;
+    const totalCount = fileCount + funcCount;
+    
+    if (totalCount === 1) {
+      setSearchMessage('Found 1 result');
+    } else {
+      setSearchMessage(`Found ${totalCount} results`);
+    }
+
+    // Navigate to first result
+    if (allResults.length > 0) {
+      navigateToResult(0, allResults);
+    }
+  }, [searchQuery, setCenter]);
+
+  const navigateToResult = useCallback((index: number, results: Array<{type: 'file' | 'function', path: string, functionName?: string, line?: number}>) => {
+    const result = results[index];
+    const targetNode = nodesRef.current.find(n => n.type === 'fileNode' && n.id === result.path);
+    
+    if (targetNode) {
+      const nodeWidth = targetNode.width || 500;
+      const centerX = targetNode.position.x + nodeWidth * 0.45;
+      
+      let centerY;
+      if (result.type === 'function' && result.line) {
+        // For functions, focus on the function's line
+        const lineOffset = (result.line - 1) * 20; // Approximate line height
+        centerY = targetNode.position.y + lineOffset + 100;
+      } else {
+        // For files, focus on top
+        centerY = targetNode.position.y + 150;
+      }
+      
+      setCenter(centerX, centerY, { duration: 500, zoom: 1.1 });
+    }
+  }, [setCenter]);
+
+  const handleNextResult = useCallback(() => {
+    if (searchResults.length === 0) return;
+    const nextIndex = (currentResultIndex + 1) % searchResults.length;
+    setCurrentResultIndex(nextIndex);
+    navigateToResult(nextIndex, searchResults);
+  }, [currentResultIndex, searchResults, navigateToResult]);
+
+  const handlePrevResult = useCallback(() => {
+    if (searchResults.length === 0) return;
+    const prevIndex = (currentResultIndex - 1 + searchResults.length) % searchResults.length;
+    setCurrentResultIndex(prevIndex);
+    navigateToResult(prevIndex, searchResults);
+  }, [currentResultIndex, searchResults, navigateToResult]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setSearchMessage('');
+    setHighlightedFiles(new Set());
+    setHighlightedFunctions(new Map());
+    setSearchResults([]);
+    setCurrentResultIndex(0);
+  }, []);
+
   const handleHover = useCallback((name: string, type: 'def' | 'call', sourcePath: string) => {
     if (selectedFunction) return; // Don't show hover edges if something is selected
     const newEdges = createEdges(name, type, sourcePath);
@@ -781,9 +917,22 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   useEffect(() => {
     if (files.length === 0) return;
 
+    // Build search index when files change
+    searchEngineRef.current.buildIndex(files);
+
     setNodes((prevNodes) => {
       const existingFileNodes = prevNodes.filter(n => n.type === 'fileNode');
       const drawingNodes = prevNodes.filter(n => n.type === 'drawingNode');
+
+      // Helper function to check if two nodes overlap
+      const checkOverlap = (pos1: {x: number, y: number}, pos2: {x: number, y: number}, minDistance: number = 650) => {
+        const dx = pos1.x - pos2.x;
+        const dy = pos1.y - pos2.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < minDistance;
+      };
+
+      const usedPositions: Array<{x: number, y: number}> = [];
 
       const newFileNodes = files.map((file, index) => {
         const existingNode = existingFileNodes.find((n) => n.id === file.path);
@@ -797,18 +946,35 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
               const row = Math.floor(index / cols);
               const col = index % cols;
               
-              // Base position with more spacing
-              const baseX = col * 700;
-              const baseY = row * 900;
+              // Base position with more spacing (increased from 700/900 to 800/1000)
+              const baseX = col * 800;
+              const baseY = row * 1000;
               
-              // Add controlled randomness for organic feel
-              const offsetX = (Math.random() - 0.5) * 250;
-              const offsetY = (Math.random() - 0.5) * 250;
+              let attempts = 0;
+              let newPos = { x: baseX, y: baseY };
               
-              return {
-                x: baseX + offsetX,
-                y: baseY + offsetY
-              };
+              // Try to find non-overlapping position
+              while (attempts < 10) {
+                const offsetX = (Math.random() - 0.5) * 200; // Reduced randomness for better spacing
+                const offsetY = (Math.random() - 0.5) * 200;
+                
+                newPos = {
+                  x: baseX + offsetX,
+                  y: baseY + offsetY
+                };
+                
+                // Check if this position overlaps with any existing position
+                const hasOverlap = usedPositions.some(pos => checkOverlap(newPos, pos));
+                
+                if (!hasOverlap) {
+                  break;
+                }
+                
+                attempts++;
+              }
+              
+              usedPositions.push(newPos);
+              return newPos;
             })();
 
         return {
@@ -816,7 +982,12 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
           type: 'fileNode',
           position,
           // Preserve width/height/style if they exist (from resizing)
-          style: { ...existingNode?.style, zIndex: 10 },
+          style: { 
+            ...existingNode?.style, 
+            zIndex: highlightedFiles.has(file.path) ? 20 : 10,
+            opacity: highlightedFiles.size > 0 && !highlightedFiles.has(file.path) ? 0.3 : 1,
+            transition: 'opacity 0.3s ease, z-index 0s'
+          },
           width: existingNode?.width,
           height: existingNode?.height,
           data: { 
@@ -830,14 +1001,16 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
             onClick: handleClick,
             onTrackFlow: handleTrackFlow,
             selectedFunction: selectedFunction,
-            onContentChange: onFileUpdate
+            onContentChange: onFileUpdate,
+            isHighlighted: highlightedFiles.has(file.path),
+            highlightedFunctions: highlightedFunctions.get(file.path) || []
           },
         };
       });
       
       return [...newFileNodes, ...drawingNodes];
     });
-  }, [files, setNodes, handleHover, handleLeave, handleClick, handleTrackFlow, selectedFunction, onFileUpdate]);
+  }, [files, setNodes, handleHover, handleLeave, handleClick, handleTrackFlow, selectedFunction, onFileUpdate, highlightedFiles, highlightedFunctions]);
 
   const handleExport = () => {
       const data = {
@@ -1155,6 +1328,70 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
             </g>
         </svg>
       </ReactFlow>
+
+      {/* Search Input Bar */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl flex items-center gap-2 p-2" style={{ width: '600px' }}>
+        <Search size={20} className="text-gray-400 ml-2" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleSearch();
+            }
+          }}
+          placeholder='Search files or functions: "login", "auth", "getLaunches"...'
+          className="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-500"
+        />
+        {searchQuery && (
+          <button
+            onClick={handleClearSearch}
+            className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+            title="Clear"
+          >
+            <X size={18} />
+          </button>
+        )}
+        <button
+          onClick={handleSearch}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
+        >
+          Search
+        </button>
+      </div>
+
+      {/* Search Message and Navigation */}
+      {searchMessage && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300">
+            {searchMessage}
+          </div>
+          
+          {/* Navigation buttons - only show if multiple results */}
+          {searchResults.length > 1 && (
+            <div className="bg-gray-900 border border-gray-700 rounded-lg flex items-center">
+              <button
+                onClick={handlePrevResult}
+                className="p-2 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors border-r border-gray-700"
+                title="Previous result"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <span className="px-3 text-sm text-gray-300 font-mono">
+                {currentResultIndex + 1} / {searchResults.length}
+              </span>
+              <button
+                onClick={handleNextResult}
+                className="p-2 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors border-l border-gray-700"
+                title="Next result"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
