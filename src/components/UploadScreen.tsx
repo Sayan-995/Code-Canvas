@@ -220,8 +220,8 @@ export const UploadScreen: React.FC = () => {
     setPendingLocalFiles(null);
   };
 
-  // Show segment selector if we have segments
-  if (segments) {
+  // Show segment selector only after video has ended (or if not loading)
+  if (segments && (!loading || videoEnded)) {
     return (
       <RepoSegmentSelector
         segments={segments}
@@ -235,7 +235,7 @@ export const UploadScreen: React.FC = () => {
 
   return (
     <div className="relative flex flex-col items-center justify-center h-screen text-white p-4 overflow-hidden">
-      {/* Background Video - plays once at 0.5x speed during loading */}
+      {/* Background Video - plays once at normal speed during loading */}
       {loading && !videoEnded && (
         <video
           autoPlay
@@ -244,9 +244,6 @@ export const UploadScreen: React.FC = () => {
           onEnded={() => setVideoEnded(true)}
           className="absolute inset-0 w-full h-full object-cover z-0"
           style={{ filter: 'brightness(0.8)' }}
-          ref={(video) => {
-            if (video) video.playbackRate = 0.5;
-          }}
         >
           <source src="/kiro_bg_2.mp4" type="video/mp4" />
         </video>
@@ -255,6 +252,7 @@ export const UploadScreen: React.FC = () => {
       {/* Dark overlay after video ends but still loading */}
       {loading && videoEnded && (
         <div className="absolute inset-0 w-full h-full bg-gray-900 z-0" />
+         
       )}
 
       {/* Static background when not loading */}
@@ -330,7 +328,7 @@ export const UploadScreen: React.FC = () => {
           <div className={`mt-8 flex flex-col items-center gap-4 transition-opacity duration-500 ${videoEnded ? 'opacity-100' : 'opacity-0'}`}>
             <Loader2 className="animate-spin text-blue-400" size={48} />
             <div className="text-center">
-              <p className="text-2xl font-bold text-white mb-2">Work in Progress</p>
+              <p className="text-2xl font-bold text-white mb-2">Delivering separator</p>
               <p className="text-lg text-gray-300">Please wait...</p>
               {loadingMessage && <p className="text-sm text-gray-400 mt-2">{loadingMessage}</p>}
             </div>
