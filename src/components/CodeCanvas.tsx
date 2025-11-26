@@ -16,9 +16,10 @@ import { FileStructure, useFileStore, Drawing } from '../store/useFileStore';
 import { FileNode } from './FileNode';
 import { FlowEdge } from './FlowEdge';
 import { DrawingNode } from './DrawingNode';
-import { PenTool, MousePointer2, Eraser, Palette, Circle, Square, Share, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PenTool, MousePointer2, Eraser, Palette, Circle, Square, Share, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic } from 'lucide-react';
 import { useCollaboration } from '../hooks/useCollaboration';
 import { CodeSearchEngine } from '../services/searchEngine';
+import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 
 const nodeTypes = {
   fileNode: FileNode,
@@ -85,6 +86,10 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const [searchResults, setSearchResults] = useState<Array<{type: 'file' | 'function', path: string, functionName?: string, line?: number}>>([]); 
   const [currentResultIndex, setCurrentResultIndex] = useState(0);
   const searchEngineRef = useRef<CodeSearchEngine>(new CodeSearchEngine());
+  
+  // Voice Search State
+  const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
+  const [voiceStatus, setVoiceStatus] = useState<'ready' | 'listening' | 'processing'>('ready');
   
   useEffect(() => {
       const params = new URLSearchParams(window.location.search);
@@ -766,6 +771,8 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
     return newEdges;
   }, [files]);
 
+
+
   const handleSearch = useCallback(() => {
     if (!searchQuery.trim()) {
       setSearchMessage('');
@@ -891,6 +898,94 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
     setSearchResults([]);
     setCurrentResultIndex(0);
   }, []);
+
+  // Voice command handler
+  const handleVoiceCommand = useCallback((transcript: string) => {
+    const command = transcript.toLowerCase().trim();
+    
+    setVoiceStatus('processing');
+    
+    // Check for navigation commands
+    if (command === 'next' || command === 'next result') {
+      if (searchResults.length > 0) {
+        handleNextResult();
+      }
+      setTimeout(() => setVoiceStatus('ready'), 500);
+      return;
+    }
+    
+    if (command === 'previous' || command === 'prev' || command === 'back') {
+      if (searchResults.length > 0) {
+        handlePrevResult();
+      }
+      setTimeout(() => setVoiceStatus('ready'), 500);
+      return;
+    }
+    
+    if (command === 'clear' || command === 'reset') {
+      handleClearSearch();
+      setTimeout(() => setVoiceStatus('ready'), 500);
+      return;
+    }
+    
+    // Otherwise, treat as search query
+    setSearchQuery(transcript);
+    
+    // Execute search with voice input
+    const searchTerm = transcript.trim().toLowerCase();
+    const results = searchEngineRef.current.search(searchTerm, 'both');
+    const totalResults = results.files.length + results.functions.length;
+    
+    if (totalResults === 0) {
+      setSearchMessage(`No matches found for "${transcript}"`);
+      setHighlightedFiles(new Set());
+      setHighlightedFunctions(new Map());
+      setSearchResults([]);
+      setTimeout(() => setVoiceStatus('ready'), 500);
+      return;
+    }
+    
+    // Process results (same as handleSearch)
+    const fileSet = new Set(results.files.map(f => f.path));
+    setHighlightedFiles(fileSet);
+    
+    const funcMap = new Map<string, string[]>();
+    results.functions.forEach(func => {
+      if (!funcMap.has(func.file)) {
+        funcMap.set(func.file, []);
+      }
+      funcMap.get(func.file)!.push(func.name);
+    });
+    setHighlightedFunctions(funcMap);
+    
+    const allResults: Array<{type: 'file' | 'function', path: string, functionName?: string, line?: number}> = [];
+    results.files.forEach(f => allResults.push({ type: 'file', path: f.path }));
+    results.functions.forEach(func => allResults.push({ type: 'function', path: func.file, functionName: func.name, line: func.line }));
+    
+    setSearchResults(allResults);
+    setCurrentResultIndex(0);
+    
+    const totalCount = totalResults;
+    setSearchMessage(totalCount === 1 ? 'Found 1 result' : `Found ${totalCount} results`);
+    
+    if (allResults.length > 0) {
+      navigateToResult(0, allResults);
+    }
+    
+    setTimeout(() => setVoiceStatus('ready'), 500);
+  }, [searchResults, handleNextResult, handlePrevResult, handleClearSearch, navigateToResult]);
+
+  // Setup voice recognition
+  const { transcript, isListening, isSupported, error: voiceError, startListening, stopListening } = useVoiceRecognition(handleVoiceCommand);
+
+  // Auto-start listening when switching to voice mode
+  useEffect(() => {
+    if (inputMode === 'voice' && isSupported && !isListening) {
+      startListening();
+    } else if (inputMode === 'text' && isListening) {
+      stopListening();
+    }
+  }, [inputMode, isSupported, isListening, startListening, stopListening]);
 
   const handleHover = useCallback((name: string, type: 'def' | 'call', sourcePath: string) => {
     if (selectedFunction) return; // Don't show hover edges if something is selected
@@ -1329,75 +1424,177 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
         </svg>
       </ReactFlow>
 
-      {/* Search Input Bar */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl flex items-center gap-2 p-2" style={{ width: '600px' }}>
-        <Search size={20} className="text-gray-400 ml-2" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleSearch();
-            }
-          }}
-          placeholder='Search files or functions: "login", "auth", "getLaunches"...'
-          className="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-500"
-        />
-        {searchQuery && (
+      {/* Search Input Bar with Tabs */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
+        {/* Tab Switcher - Compact */}
+        <div className="flex gap-1 mb-2">
           <button
-            onClick={handleClearSearch}
-            className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
-            title="Clear"
+            onClick={() => setInputMode('text')}
+            className={`px-6 py-2 rounded-t-lg text-sm font-medium transition-colors ${
+              inputMode === 'text'
+                ? 'bg-gray-800 text-white border-t border-x border-gray-700'
+                : 'bg-gray-900 text-gray-400 hover:text-gray-300'
+            }`}
           >
-            <X size={18} />
+            Text
           </button>
-        )}
-        <button
-          onClick={handleSearch}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
-        >
-          Search
-        </button>
-      </div>
-
-      {/* Search Message and Navigation */}
-      {searchMessage && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3">
-          <div className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300">
-            {searchMessage}
-          </div>
-          
-          {/* Navigation buttons - only show if multiple results */}
-          {searchResults.length > 1 && (
-            <div className="bg-gray-900 border border-gray-700 rounded-lg flex items-center">
-              <button
-                onClick={handlePrevResult}
-                className="p-2 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors border-r border-gray-700"
-                title="Previous result"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="px-3 text-sm text-gray-300 font-mono">
-                {currentResultIndex + 1} / {searchResults.length}
-              </span>
-              <button
-                onClick={handleNextResult}
-                className="p-2 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors border-l border-gray-700"
-                title="Next result"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          )}
+          <button
+            onClick={() => setInputMode('voice')}
+            className={`px-6 py-2 rounded-t-lg text-sm font-medium transition-colors ${
+              inputMode === 'voice'
+                ? 'bg-gray-800 text-white border-t border-x border-gray-700'
+                : 'bg-gray-900 text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            Voice
+          </button>
         </div>
-      )}
+
+        {/* Content based on mode */}
+        {inputMode === 'text' ? (
+          <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl flex items-center gap-2 p-2" style={{ width: '600px' }}>
+            <Search size={20} className="text-gray-400 ml-2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch();
+                }
+              }}
+              placeholder='Search files or functions: "login", "auth", "getLaunches"...'
+              className="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={handleClearSearch}
+                className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                title="Clear"
+              >
+                <X size={18} />
+              </button>
+            )}
+            <button
+              onClick={handleSearch}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
+            >
+              Search
+            </button>
+            {searchResults.length > 0 && (
+              <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
+                <button
+                  onClick={handlePrevResult}
+                  className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                  title="Previous result"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="text-xs text-gray-400 px-2">
+                  {currentResultIndex + 1} / {searchResults.length}
+                </span>
+                <button
+                  onClick={handleNextResult}
+                  className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                  title="Next result"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            )}
+            {searchMessage && (
+              <span className="text-xs text-gray-400 border-l border-gray-700 pl-3">
+                {searchMessage}
+              </span>
+            )}
+          </div>
+        ) : (
+          /* Voice Mode - Compact with background box */
+          <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl flex items-center gap-2 p-2" style={{ width: '600px' }}>
+            {!isSupported ? (
+              <div className="flex-1 text-center">
+                <p className="text-red-400 text-xs">Voice not supported in this browser</p>
+              </div>
+            ) : (
+              <>
+                {/* Compact Mic Button */}
+                <button
+                  onClick={isListening ? stopListening : startListening}
+                  disabled={!isSupported}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+                    isListening
+                      ? 'bg-purple-600 animate-pulse-mic'
+                      : voiceStatus === 'processing'
+                      ? 'bg-purple-600 animate-spin-slow'
+                      : 'bg-purple-600 hover:bg-purple-700'
+                  }`}
+                  title={isListening ? 'Stop listening' : 'Start voice search'}
+                >
+                  <Mic size={20} className="text-white" />
+                </button>
+
+                {/* Status and Transcript */}
+                <div className="flex-1 min-w-0">
+                  {transcript ? (
+                    <p className="text-white text-sm truncate">"{transcript}"</p>
+                  ) : (
+                    <p className="text-gray-400 text-sm">
+                      {isListening
+                        ? 'Listening...'
+                        : voiceStatus === 'processing'
+                        ? 'Processing...'
+                        : searchResults.length > 0
+                        ? 'Say "next" or "previous"'
+                        : 'Click mic to search'}
+                    </p>
+                  )}
+                  {voiceError && (
+                    <p className="text-red-400 text-xs truncate">{voiceError}</p>
+                  )}
+                </div>
+
+                {/* Navigation Controls */}
+                {searchResults.length > 0 && (
+                  <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
+                    <button
+                      onClick={handlePrevResult}
+                      className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                      title="Previous result"
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+                    <span className="text-xs text-gray-400 px-2">
+                      {currentResultIndex + 1} / {searchResults.length}
+                    </span>
+                    <button
+                      onClick={handleNextResult}
+                      className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                      title="Next result"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Search Message */}
+                {searchMessage && !transcript && (
+                  <span className="text-xs text-gray-400 border-l border-gray-700 pl-3">
+                    {searchMessage}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-export const CodeCanvas: React.FC<CodeCanvasProps> = (props) => (
-  <ReactFlowProvider>
-    <CodeCanvasContent {...props} />
-  </ReactFlowProvider>
-);
+export const CodeCanvas: React.FC<CodeCanvasProps> = (props) => {
+  return (
+    <ReactFlowProvider>
+      <CodeCanvasContent {...props} />
+    </ReactFlowProvider>
+  );
+};
