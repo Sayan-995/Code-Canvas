@@ -28,6 +28,7 @@ export const UploadScreen: React.FC = () => {
   const [repoUrl, setRepoUrl] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [error, setError] = useState('');
+  const [videoEnded, setVideoEnded] = useState(false);
   
   // Segmentation state
   const [segments, setSegments] = useState<FileSegment[] | null>(null);
@@ -64,6 +65,7 @@ export const UploadScreen: React.FC = () => {
     if (!fileList) return;
 
     setLoading(true);
+    setVideoEnded(false);
     setLoadingMessage('Reading files...');
     setError('');
 
@@ -101,6 +103,7 @@ export const UploadScreen: React.FC = () => {
   const handleGithubImport = async () => {
     if (!repoUrl) return;
     setLoading(true);
+    setVideoEnded(false);
     setLoadingMessage('Fetching repository structure...');
     setError('');
 
@@ -231,17 +234,48 @@ export const UploadScreen: React.FC = () => {
 
 
   return (
-    <div 
-      className="flex flex-col items-center justify-center h-screen text-white p-4"
-      style={{ 
-        backgroundImage: 'url(/kiro_bg.png)', 
-        backgroundSize: 'cover', 
-        backgroundPosition: 'center' 
-      }}
-    >
-      <h1 className="text-4xl font-bold mb-8">Code Canvas</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+    <div className="relative flex flex-col items-center justify-center h-screen text-white p-4 overflow-hidden">
+      {/* Background Video - plays once at 0.5x speed during loading */}
+      {loading && !videoEnded && (
+        <video
+          autoPlay
+          muted
+          playsInline
+          onEnded={() => setVideoEnded(true)}
+          className="absolute inset-0 w-full h-full object-cover z-0"
+          style={{ filter: 'brightness(0.8)' }}
+          ref={(video) => {
+            if (video) video.playbackRate = 0.5;
+          }}
+        >
+          <source src="/kiro_bg_2.mp4" type="video/mp4" />
+        </video>
+      )}
+
+      {/* Dark overlay after video ends but still loading */}
+      {loading && videoEnded && (
+        <div className="absolute inset-0 w-full h-full bg-gray-900 z-0" />
+      )}
+
+      {/* Static background when not loading */}
+      {!loading && (
+        <div 
+          className="absolute inset-0 w-full h-full z-0"
+          style={{ 
+            backgroundImage: 'url(/kiro_bg.png)', 
+            backgroundSize: 'cover', 
+            backgroundPosition: 'center' 
+          }}
+        />
+      )}
+
+      {/* Content overlay */}
+      <div className="relative z-10 flex flex-col items-center w-full">
+        <h1 className={`text-4xl font-bold mb-8 transition-all duration-500 ${loading ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
+          Code Canvas
+        </h1>
+        
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl transition-all duration-500 ${loading ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
         {/* Local Upload */}
         <div className="bg-gray-800 p-8 rounded-xl border border-gray-700 hover:border-blue-500 transition-colors flex flex-col items-center gap-4">
           <FolderUp size={48} className="text-blue-400" />
@@ -292,16 +326,23 @@ export const UploadScreen: React.FC = () => {
         </div>
       </div>
 
-      {loading && (
-        <div className="mt-8 flex items-center gap-2 text-blue-400">
-          <Loader2 className="animate-spin" />
-          <span>{loadingMessage || 'Processing...'}</span>
-        </div>
-      )}
+        {loading && (
+          <div className={`mt-8 flex flex-col items-center gap-4 transition-opacity duration-500 ${videoEnded ? 'opacity-100' : 'opacity-0'}`}>
+            <Loader2 className="animate-spin text-blue-400" size={48} />
+            <div className="text-center">
+              <p className="text-2xl font-bold text-white mb-2">Work in Progress</p>
+              <p className="text-lg text-gray-300">Please wait...</p>
+              {loadingMessage && <p className="text-sm text-gray-400 mt-2">{loadingMessage}</p>}
+            </div>
+          </div>
+        )}
 
-      {error && (
-        <div className="mt-8 text-red-400">{error}</div>
-      )}
+        {error && (
+          <div className="mt-8 text-red-400 bg-red-900/30 px-6 py-3 rounded-lg border border-red-500">
+            {error}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
