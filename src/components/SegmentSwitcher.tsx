@@ -102,7 +102,7 @@ export const SegmentSwitcher: React.FC = () => {
 
 
   return (
-    <div className="absolute top-4 left-4 z-50">
+    <div className="absolute bottom-4 left-20 z-50">
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isLoading}
@@ -114,7 +114,7 @@ export const SegmentSwitcher: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute top-12 left-0 bg-gray-800 border border-gray-600 rounded-lg shadow-xl w-72 overflow-hidden">
+        <div className="absolute bottom-12 left-0 bg-gray-800 border border-gray-600 rounded-lg shadow-xl w-72 overflow-hidden">
           <div className="p-3 border-b border-gray-700 flex justify-between items-center">
             <span className="text-sm text-gray-400">Switch code segments</span>
             <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white">

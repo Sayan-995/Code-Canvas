@@ -16,7 +16,7 @@ import { FileStructure, useFileStore, Drawing } from '../store/useFileStore';
 import { FileNode } from './FileNode';
 import { FlowEdge } from './FlowEdge';
 import { DrawingNode } from './DrawingNode';
-import { PenTool, MousePointer2, Eraser, Palette, Circle, Square, Share, Minus, Type, Hand, Link as LinkIcon } from 'lucide-react';
+import { PenTool, MousePointer2, Eraser, Circle, Square, Minus, Type, Hand, Link as LinkIcon } from 'lucide-react';
 import { useCollaboration } from '../hooks/useCollaboration';
 
 const nodeTypes = {
@@ -44,9 +44,10 @@ interface CodeCanvasProps {
   files: FileStructure[];
   onBack: () => void;
   onFileUpdate: (path: string, newContent: string) => void;
+  onFlowStateChange?: (isPlaying: boolean) => void;
 }
 
-const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpdate }) => {
+const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpdate, onFlowStateChange }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
@@ -69,9 +70,6 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const [flowSpeed, setFlowSpeed] = useState(0.5);
   const [dotProgress, setDotProgress] = useState(0);
   const animationFrameRef = useRef<number | null>(null);
-  const [speedBarPosition, setSpeedBarPosition] = useState({ x: window.innerWidth - 280, y: 16 });
-  const [isDraggingSpeedBar, setIsDraggingSpeedBar] = useState(false);
-  const speedBarRef = useRef<HTMLDivElement>(null);
 
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -116,30 +114,6 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
-
-  // Handle speed bar dragging
-  useEffect(() => {
-    if (!isDraggingSpeedBar) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      setSpeedBarPosition({
-        x: Math.max(0, Math.min(window.innerWidth - 280, e.clientX - 140)),
-        y: Math.max(0, Math.min(window.innerHeight - 60, e.clientY - 20))
-      });
-    };
-
-    const handleMouseUp = () => {
-      setIsDraggingSpeedBar(false);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDraggingSpeedBar]);
 
   // Sync drawings to nodes
   useEffect(() => {
@@ -249,7 +223,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
     setCurrentPath([]);
   }, [isDrawing, currentPath, tool, currentColor, currentWidth, addDrawing, isSpacePressed, addDrawingToYjs]);
 
-  const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
+  const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
       if (isDrawing && tool === 'eraser' && node.type === 'drawingNode') {
           // Defer removal to avoid React Flow event conflicts
           requestAnimationFrame(() => {
@@ -423,9 +397,10 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
       setFlowPath(stepsWithPrepare);
       setCurrentStepIndex(0);
       setIsPlayingFlow(true);
+      onFlowStateChange?.(true);
       setSelectedFunction(null); // Clear selection to focus on flow
     }
-  }, [generateFlowPath]);
+  }, [generateFlowPath, onFlowStateChange]);
 
   // Animation Loop
   useEffect(() => {
@@ -609,6 +584,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   
   const finishFlow = () => {
     setIsPlayingFlow(false);
+    onFlowStateChange?.(false);
     setCurrentStepIndex(0);
     setFlowPath([]);
     setExecutedLines(new Map());
@@ -839,20 +815,6 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
     });
   }, [files, setNodes, handleHover, handleLeave, handleClick, handleTrackFlow, selectedFunction, onFileUpdate]);
 
-  const handleExport = () => {
-      const data = {
-          files,
-          drawings
-      };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'code-canvas-export.json';
-      a.click();
-      URL.revokeObjectURL(url);
-  };
-
   return (
     <div 
         className={`w-full h-screen bg-[#1e1e1e] relative ${isSpacePressed || tool === 'hand' ? 'cursor-grab' : (isDrawing ? (tool === 'eraser' ? 'cursor-eraser' : tool === 'text' ? 'cursor-text' : tool === 'select' ? '' : 'cursor-pen') : '')}`}
@@ -951,21 +913,14 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
 
       {isPlayingFlow && (
         <div 
-          ref={speedBarRef}
-          className="absolute z-50 bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center gap-3 shadow-xl cursor-move"
+          className="absolute z-50 bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center gap-3 shadow-xl"
           style={{ 
-            left: `${speedBarPosition.x}px`, 
-            top: `${speedBarPosition.y}px`,
+            right: '20px', 
+            top: '20px',
             userSelect: 'none'
           }}
-          onMouseDown={(e) => {
-            if (e.target === speedBarRef.current || (e.target as HTMLElement).tagName === 'SPAN') {
-              setIsDraggingSpeedBar(true);
-              e.preventDefault();
-            }
-          }}
         >
-          <span className="text-white text-sm cursor-move">Flow Speed:</span>
+          <span className="text-white text-sm">Flow Speed:</span>
           <input 
             type="range" 
             min="0.25" 
@@ -975,7 +930,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
             onChange={(e) => setFlowSpeed(parseFloat(e.target.value))}
             className="w-32 accent-blue-500 cursor-pointer"
           />
-          <span className="text-white text-sm font-mono cursor-move">{flowSpeed}x</span>
+          <span className="text-white text-sm font-mono">{flowSpeed}x</span>
           <button
             onClick={finishFlow}
             className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm cursor-pointer"

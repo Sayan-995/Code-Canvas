@@ -24,6 +24,7 @@ export function CodeEditor() {
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [showConflictResolver, setShowConflictResolver] = useState(false);
   const [pendingSha, setPendingSha] = useState<string | null>(null);
+  const [isFlowPlaying, setIsFlowPlaying] = useState(false);
 
   const handleDownload = async () => {
     const zip = new JSZip();
@@ -272,40 +273,43 @@ export function CodeEditor() {
         <UploadScreen />
       ) : (
         <>
-          <div className="absolute top-4 right-4 z-50 flex gap-2">
-             {githubContext && (
-               <>
-                 <button
-                  onClick={handlePullFromGithub}
-                  disabled={isPulling || isPushing}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-lg"
-                >
-                  {isPulling ? <Loader2 className="animate-spin" size={20} /> : <GitPullRequest size={20} />}
-                  Pull
-                </button>
-                 <button
-                  onClick={handlePushToGithub}
-                  disabled={isPushing || isPulling}
-                  className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-lg"
-                >
-                  {isPushing ? <Loader2 className="animate-spin" size={20} /> : <Github size={20} />}
-                  Push
-                </button>
-               </>
-             )}
-             <button
-              onClick={handleDownload}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-lg"
-            >
-              <Download size={20} />
-              Download Zip
-            </button>
-          </div>
+          {!isFlowPlaying && (
+            <div className="absolute top-4 right-4 z-50 flex gap-2">
+              {githubContext && (
+                <>
+                  <button
+                    onClick={handlePullFromGithub}
+                    disabled={isPulling || isPushing}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-lg"
+                  >
+                    {isPulling ? <Loader2 className="animate-spin" size={20} /> : <GitPullRequest size={20} />}
+                    Pull
+                  </button>
+                  <button
+                    onClick={handlePushToGithub}
+                    disabled={isPushing || isPulling}
+                    className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-lg"
+                  >
+                    {isPushing ? <Loader2 className="animate-spin" size={20} /> : <Github size={20} />}
+                    Push
+                  </button>
+                </>
+              )}
+              <button
+                onClick={handleDownload}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-lg"
+              >
+                <Download size={20} />
+                Download Zip
+              </button>
+            </div>
+          )}
           <SegmentSwitcher />
           <CodeCanvas 
             files={files} 
             onBack={() => clearFiles()} 
             onFileUpdate={updateFileContent}
+            onFlowStateChange={setIsFlowPlaying}
           />
           <ExplanationPanel />
         </>
