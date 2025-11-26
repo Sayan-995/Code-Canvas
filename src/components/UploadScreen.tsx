@@ -1,15 +1,39 @@
 import React, { useState } from 'react';
-import { useFileStore, FileStructure } from '../store/useFileStore';
+import { useFileStore, FileStructure, FileSegment } from '../store/useFileStore';
 import { Github, FolderUp, Loader2 } from 'lucide-react';
 import { Octokit } from '@octokit/rest';
 import { analyzeCode } from '../utils/codeAnalyzer';
+import { categorizeRepository } from '../services/repoSeparator';
+import { RepoSegmentSelector } from './RepoSegmentSelector';
+
+interface GitHubTreeNode {
+  path: string;
+  sha: string;
+  type: string;
+}
+
+interface PendingGitHubData {
+  owner: string;
+  repo: string;
+  branch: string;
+  sha: string;
+  tree: GitHubTreeNode[];
+  octokit: Octokit;
+}
 
 export const UploadScreen: React.FC = () => {
-  const { setFiles, setGitHubContext } = useFileStore();
+  const { setFiles, setGitHubContext, setCachedRepoData } = useFileStore();
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [error, setError] = useState('');
+  
+  // Segmentation state
+  const [segments, setSegments] = useState<FileSegment[] | null>(null);
+  const [pendingGitHubData, setPendingGitHubData] = useState<PendingGitHubData | null>(null);
+  const [pendingLocalFiles, setPendingLocalFiles] = useState<FileStructure[] | null>(null);
+  const [isLoadingSelected, setIsLoadingSelected] = useState(false);
 
   const processFiles = (files: FileStructure[]) => {
     return files.map(file => {
@@ -26,121 +50,6 @@ export const UploadScreen: React.FC = () => {
     });
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const fileList = event.target.files;
-    if (!fileList) return;
-
-    setLoading(true);
-    setError('');
-    const newFiles: FileStructure[] = [];
-
-    try {
-      for (let i = 0; i < fileList.length; i++) {
-        const file = fileList[i];
-        if (file.webkitRelativePath.includes('node_modules') || file.webkitRelativePath.includes('.git')) {
-          continue;
-        }
-
-        const text = await file.text();
-        newFiles.push({
-          path: file.webkitRelativePath,
-          name: file.name,
-          content: text,
-          language: getLanguage(file.name),
-        });
-      }
-      
-      const analyzedFiles = processFiles(newFiles);
-      setFiles(analyzedFiles);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to process files');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGithubImport = async () => {
-    if (!repoUrl) return;
-    setLoading(true);
-    setError('');
-
-    try {
-      const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
-      if (!match) {
-        throw new Error('Invalid GitHub URL');
-      }
-      const owner = match[1];
-      const repo = match[2];
-
-      const octokit = new Octokit({
-        auth: githubToken || undefined
-      });
-
-      const { data: repoData } = await octokit.repos.get({
-        owner,
-        repo,
-      });
-      const defaultBranch = repoData.default_branch;
-
-      // Get the commit SHA of the default branch
-      const { data: refData } = await octokit.git.getRef({
-        owner,
-        repo,
-        ref: `heads/${defaultBranch}`,
-      });
-      const latestCommitSha = refData.object.sha;
-
-      const { data: treeData } = await octokit.git.getTree({
-        owner,
-        repo,
-        tree_sha: latestCommitSha,
-        recursive: 'true',
-      });
-
-      const newFiles: FileStructure[] = [];
-      
-      const filesToFetch = treeData.tree.filter((node: any) => node.type === 'blob' && !node.path.includes('package-lock.json') && !node.path.includes('yarn.lock'));
-
-      for (const node of filesToFetch) {
-         if (isRelevantFile(node.path)) {
-            const { data: contentData } = await octokit.git.getBlob({
-                owner,
-                repo,
-                file_sha: node.sha,
-            });
-            
-            const content = atob(contentData.content.replace(/\n/g, ''));
-            newFiles.push({
-                path: node.path,
-                name: node.path.split('/').pop() || node.path,
-                content: content,
-                lastSyncedContent: content, // Track original content for conflict detection
-                language: getLanguage(node.path),
-            });
-         }
-      }
-
-      const analyzedFiles = processFiles(newFiles);
-      setFiles(analyzedFiles);
-      setGitHubContext({ owner, repo, branch: defaultBranch, token: githubToken, sha: latestCommitSha });
-
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Failed to import from GitHub');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const isRelevantFile = (path: string) => {
-      return !path.includes('node_modules') && 
-             !path.includes('.git') && 
-             !path.endsWith('.png') && 
-             !path.endsWith('.jpg') &&
-             !path.endsWith('.ico');
-  }
-
   const getLanguage = (filename: string) => {
     if (filename.endsWith('.tsx') || filename.endsWith('.ts')) return 'typescript';
     if (filename.endsWith('.jsx') || filename.endsWith('.js')) return 'javascript';
@@ -149,8 +58,187 @@ export const UploadScreen: React.FC = () => {
     return 'plaintext';
   };
 
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = event.target.files;
+    if (!fileList) return;
+
+    setLoading(true);
+    setLoadingMessage('Reading files...');
+    setError('');
+
+    try {
+      const newFiles: FileStructure[] = [];
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        if (file.webkitRelativePath.includes('node_modules') || file.webkitRelativePath.includes('.git')) {
+          continue;
+        }
+        const text = await file.text();
+        newFiles.push({
+          path: file.webkitRelativePath,
+          name: file.name,
+          content: text,
+          language: getLanguage(file.name),
+        });
+      }
+
+      setLoadingMessage('AI is categorizing your repository...');
+      const filePaths = newFiles.map(f => f.path);
+      const result = await categorizeRepository(filePaths);
+      
+      setPendingLocalFiles(newFiles);
+      setSegments(result.segments);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to process files');
+    } finally {
+      setLoading(false);
+      setLoadingMessage('');
+    }
+  };
+
+  const handleGithubImport = async () => {
+    if (!repoUrl) return;
+    setLoading(true);
+    setLoadingMessage('Fetching repository structure...');
+    setError('');
+
+    try {
+      const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+      if (!match) throw new Error('Invalid GitHub URL');
+      
+      const owner = match[1];
+      const repo = match[2];
+      const octokit = new Octokit({ auth: githubToken || undefined });
+
+      const { data: repoData } = await octokit.repos.get({ owner, repo });
+      const defaultBranch = repoData.default_branch;
+
+      const { data: refData } = await octokit.git.getRef({
+        owner, repo, ref: `heads/${defaultBranch}`,
+      });
+      const latestCommitSha = refData.object.sha;
+
+      const { data: treeData } = await octokit.git.getTree({
+        owner, repo, tree_sha: latestCommitSha, recursive: 'true',
+      });
+
+      const allFiles = treeData.tree.filter((node: any) => 
+        node.type === 'blob' && 
+        !node.path.includes('node_modules') && 
+        !node.path.includes('.git') &&
+        !node.path.includes('package-lock.json') &&
+        !node.path.includes('yarn.lock')
+      );
+
+      setLoadingMessage('AI is categorizing your repository...');
+      const filePaths = allFiles.map((f: any) => f.path);
+      const result = await categorizeRepository(filePaths);
+
+      setPendingGitHubData({
+        owner, repo, branch: defaultBranch, sha: latestCommitSha,
+        tree: allFiles as GitHubTreeNode[], octokit
+      });
+      setSegments(result.segments);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Failed to import from GitHub');
+    } finally {
+      setLoading(false);
+      setLoadingMessage('');
+    }
+  };
+
+
+  const handleSegmentConfirm = async (selectedFiles: string[], selectedCategories: Set<string>) => {
+    setIsLoadingSelected(true);
+    
+    try {
+      if (pendingLocalFiles && segments) {
+        // Local files - process all, then filter for display
+        const analyzed = processFiles(pendingLocalFiles);
+        const filtered = analyzed.filter(f => selectedFiles.includes(f.path));
+        
+        setFiles(filtered);
+        setCachedRepoData({
+          segments,
+          allFiles: analyzed,
+          selectedCategories
+        });
+      } else if (pendingGitHubData && segments) {
+        // GitHub - fetch only selected files initially, store tree for lazy loading
+        const { owner, repo, branch, sha, tree, octokit } = pendingGitHubData;
+        const selectedSet = new Set(selectedFiles);
+        const filesToFetch = tree.filter(node => selectedSet.has(node.path));
+        const pendingTree = tree.filter(node => !selectedSet.has(node.path));
+
+        const fetchedFiles: FileStructure[] = [];
+        for (const node of filesToFetch) {
+          try {
+            const { data: contentData } = await octokit.git.getBlob({
+              owner, repo, file_sha: node.sha,
+            });
+            const content = atob(contentData.content.replace(/\n/g, ''));
+            fetchedFiles.push({
+              path: node.path,
+              name: node.path.split('/').pop() || node.path,
+              content,
+              lastSyncedContent: content,
+              language: getLanguage(node.path),
+            });
+          } catch (e) {
+            console.error(`Failed to fetch ${node.path}`, e);
+          }
+        }
+
+        const analyzed = processFiles(fetchedFiles);
+        
+        setFiles(analyzed);
+        setCachedRepoData({
+          segments,
+          allFiles: analyzed,
+          selectedCategories,
+          pendingTree: pendingTree.map(n => ({ path: n.path, sha: n.sha }))
+        });
+        setGitHubContext({ owner, repo, branch, token: githubToken, sha });
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load selected files');
+    } finally {
+      setIsLoadingSelected(false);
+    }
+  };
+
+  const handleBack = () => {
+    setSegments(null);
+    setPendingGitHubData(null);
+    setPendingLocalFiles(null);
+  };
+
+  // Show segment selector if we have segments
+  if (segments) {
+    return (
+      <RepoSegmentSelector
+        segments={segments}
+        onConfirm={handleSegmentConfirm}
+        onBack={handleBack}
+        isLoading={isLoadingSelected}
+      />
+    );
+  }
+
+
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white p-4">
+    <div 
+      className="flex flex-col items-center justify-center h-screen text-white p-4"
+      style={{ 
+        backgroundImage: 'url(/kiro_bg.png)', 
+        backgroundSize: 'cover', 
+        backgroundPosition: 'center' 
+      }}
+    >
       <h1 className="text-4xl font-bold mb-8">Code Canvas</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
@@ -207,14 +295,12 @@ export const UploadScreen: React.FC = () => {
       {loading && (
         <div className="mt-8 flex items-center gap-2 text-blue-400">
           <Loader2 className="animate-spin" />
-          <span>Processing files...</span>
+          <span>{loadingMessage || 'Processing...'}</span>
         </div>
       )}
 
       {error && (
-        <div className="mt-8 text-red-400">
-          {error}
-        </div>
+        <div className="mt-8 text-red-400">{error}</div>
       )}
     </div>
   );

@@ -27,10 +27,31 @@ interface GitHubContext {
   sha?: string;
 }
 
+export interface FileSegment {
+  category: string;
+  description: string;
+  files: string[];
+  icon: string;
+}
+
+export interface GitHubTreeNode {
+  path: string;
+  sha: string;
+}
+
+export interface CachedRepoData {
+  segments: FileSegment[];
+  allFiles: FileStructure[]; // Fetched files cached
+  selectedCategories: Set<string>;
+  // For GitHub lazy loading
+  pendingTree?: GitHubTreeNode[]; // Files not yet fetched
+}
+
 interface FileStore {
   files: FileStructure[];
   drawings: Drawing[];
   githubContext: GitHubContext | null;
+  cachedRepoData: CachedRepoData | null;
   setFiles: (files: FileStructure[]) => void;
   addFile: (file: FileStructure) => void;
   updateFileContent: (path: string, newContent: string) => void;
@@ -42,12 +63,16 @@ interface FileStore {
   updateDrawing: (id: string, updates: Partial<Drawing>) => void;
   removeDrawing: (id: string) => void;
   setDrawings: (drawings: Drawing[] | ((prev: Drawing[]) => Drawing[])) => void;
+  setCachedRepoData: (data: CachedRepoData | null) => void;
+  switchSegments: (categories: Set<string>) => void;
+  addToCache: (files: FileStructure[]) => void;
 }
 
 export const useFileStore = create<FileStore>((set) => ({
   files: [],
   drawings: [],
   githubContext: null,
+  cachedRepoData: null,
   setFiles: (files) => set({ files }),
   addFile: (file) => set((state) => ({ files: [...state.files, file] })),
   updateFileContent: (path, newContent) => set((state) => {
@@ -62,7 +87,7 @@ export const useFileStore = create<FileStore>((set) => ({
     return { files: updatedFiles };
   }),
   setGitHubContext: (context) => set({ githubContext: context }),
-  clearFiles: () => set({ files: [], drawings: [], githubContext: null }),
+  clearFiles: () => set({ files: [], drawings: [], githubContext: null, cachedRepoData: null }),
   updateFileAnalysis: (path, analysis) => set((state) => ({
     files: state.files.map((f) => (f.path === path ? { ...f, analysis } : f)),
   })),
@@ -81,4 +106,32 @@ export const useFileStore = create<FileStore>((set) => ({
       ? (drawingsOrUpdater as (prev: Drawing[]) => Drawing[])(state.drawings)
       : drawingsOrUpdater
   })),
+  setCachedRepoData: (data) => set({ cachedRepoData: data }),
+  switchSegments: (categories) => set((state) => {
+    if (!state.cachedRepoData) return {};
+    
+    const selectedPaths = new Set(
+      state.cachedRepoData.segments
+        .filter(s => categories.has(s.category))
+        .flatMap(s => s.files)
+    );
+    
+    const newFiles = state.cachedRepoData.allFiles.filter(f => selectedPaths.has(f.path));
+    
+    return {
+      files: newFiles,
+      cachedRepoData: { ...state.cachedRepoData, selectedCategories: categories }
+    };
+  }),
+  addToCache: (files) => set((state) => {
+    if (!state.cachedRepoData) return {};
+    const existingPaths = new Set(state.cachedRepoData.allFiles.map(f => f.path));
+    const newFiles = files.filter(f => !existingPaths.has(f.path));
+    return {
+      cachedRepoData: {
+        ...state.cachedRepoData,
+        allFiles: [...state.cachedRepoData.allFiles, ...newFiles]
+      }
+    };
+  }),
 }));

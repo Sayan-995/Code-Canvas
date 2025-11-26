@@ -3,6 +3,7 @@ import { useFileStore } from '../store/useFileStore';
 import { UploadScreen } from './UploadScreen';
 import { CodeCanvas } from './CodeCanvas';
 import { ConflictResolver } from './ConflictResolver';
+import { SegmentSwitcher } from './SegmentSwitcher';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { Download, Github, Loader2, GitPullRequest } from 'lucide-react';
@@ -17,7 +18,7 @@ interface Conflict {
 }
 
 export function CodeEditor() {
-  const { files, setFiles, updateFileContent, githubContext, markAllAsSynced, setGitHubContext } = useFileStore();
+  const { files, setFiles, updateFileContent, githubContext, markAllAsSynced, setGitHubContext, clearFiles } = useFileStore();
   const [isPushing, setIsPushing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
@@ -300,9 +301,10 @@ export function CodeEditor() {
               Download Zip
             </button>
           </div>
+          <SegmentSwitcher />
           <CodeCanvas 
             files={files} 
-            onBack={() => setFiles([])} 
+            onBack={() => clearFiles()} 
             onFileUpdate={updateFileContent}
           />
           <ExplanationPanel />
