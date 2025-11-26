@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Fix Video Padding & Sizing",
+  "description": "Monitors CSS and component files to ensure video elements have proper padding from browser edges and correct width/height to fit screen without being cut off",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.css",
+      "src/**/*.tsx",
+      "src/**/*.jsx",
+      "index.html"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the video element styling in the modified files. Ensure that: 1) Video elements have appropriate padding/margin from the browser edges (corners) so they don't get cut off, 2) Width and height are set properly to fit the screen nicely without any parts being cut by the browser edge, 3) Consider using properties like object-fit, max-width, max-height, padding, or margin to achieve proper video display. Fix any issues found."
+  }
+}

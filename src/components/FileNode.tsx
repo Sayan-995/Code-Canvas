@@ -1,9 +1,11 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, useNodeId } from 'reactflow';
-import { FileCode, Edit2, Save, X, Play, Sparkles } from 'lucide-react';
+import { FileCode, Edit2, Save, X, Play, Sparkles, BookOpen, Code, Loader2 } from 'lucide-react';
 import { FileAnalysis } from '../utils/codeAnalyzer';
 import { explainCode } from '../services/gemini';
 import { useExplanationStore } from '../store/useExplanationStore';
+import { useFileStore } from '../store/useFileStore';
+import { summarizeFunctions, FunctionSummary } from '../services/functionSummarizer';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-typescript';
@@ -72,12 +74,34 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
   const [hoveredFunction, setHoveredFunction] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(data.content);
+  const [functionSummaries, setFunctionSummaries] = useState<FunctionSummary[]>([]);
+  const [isLoadingSummaries, setIsLoadingSummaries] = useState(false);
+  const [localViewMode, setLocalViewMode] = useState<'full' | 'understanding' | null>(null);
   
   const { openExplanation } = useExplanationStore();
+  const { cachedRepoData } = useFileStore();
+  
+  // Determine effective view mode (local override or global)
+  const viewMode = localViewMode ?? cachedRepoData?.viewMode ?? 'full';
+  const isCodeFile = ['typescript', 'javascript'].includes(data.language);
   
   const nodeId = useNodeId();
   const { setNodes, getNode } = useReactFlow();
   const resizeRef = useRef<HTMLDivElement>(null);
+  
+  // Load function summaries when in understanding view
+  useEffect(() => {
+    if (viewMode === 'understanding' && isCodeFile && functionSummaries.length === 0 && !isLoadingSummaries) {
+      setIsLoadingSummaries(true);
+      summarizeFunctions(data.content, data.path)
+        .then(summaries => {
+          setFunctionSummaries(summaries);
+        })
+        .finally(() => {
+          setIsLoadingSummaries(false);
+        });
+    }
+  }, [viewMode, data.content, data.path, isCodeFile, functionSummaries.length, isLoadingSummaries]);
 
   useEffect(() => {
     setEditContent(data.content);
@@ -561,8 +585,69 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
               }}
               textareaClassName="focus:outline-none"
             />
-          ) : (
+          ) : viewMode === 'understanding' && isCodeFile ? (
+            /* Understanding View */
             <div className="whitespace-pre-wrap break-words">
+              {isLoadingSummaries ? (
+                <div className="flex items-center gap-3 text-gray-400 py-4">
+                  <Loader2 className="animate-spin" size={20} />
+                  <span>AI is analyzing functions...</span>
+                </div>
+              ) : functionSummaries.length === 0 ? (
+                <div className="text-gray-500 py-2">
+                  <p>// No functions detected in this file</p>
+                  <p>// Original: {data.content.split('\n').length} lines</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-purple-400 border-b border-purple-400/30 pb-2 mb-4">
+                    // 📖 Understanding View - {functionSummaries.length} function(s)
+                  </div>
+                  {functionSummaries.map((fn, idx) => (
+                    <div key={idx} className="border-l-2 border-purple-500/50 pl-3 py-1 hover:bg-purple-500/10 rounded-r">
+                      <div className="text-green-400">/**</div>
+                      <div className="text-green-400 pl-2">* {fn.description}</div>
+                      {fn.params && <div className="text-green-400 pl-2">* @params {fn.params}</div>}
+                      {fn.returns && <div className="text-green-400 pl-2">* @returns {fn.returns}</div>}
+                      <div className="text-green-400">*/</div>
+                      <div>
+                        <span className="text-purple-400">function </span>
+                        <span className="text-yellow-300">{fn.name}</span>
+                        <span className="text-gray-400">() {'{ /* ... */ }'}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="mt-4 pt-2 border-t border-gray-700">
+                    <button
+                      onClick={() => setLocalViewMode('full')}
+                      className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-xs"
+                    >
+                      <Code size={14} />
+                      Switch to Full Code View
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Full Code View */
+            <div className="whitespace-pre-wrap break-words">
+              {viewMode === 'understanding' && !isCodeFile && (
+                <div className="text-gray-500 text-xs mb-2 pb-2 border-b border-gray-700">
+                  // Non-code file - showing full content
+                </div>
+              )}
+              {localViewMode === 'full' && cachedRepoData?.viewMode === 'understanding' && (
+                <div className="mb-2 pb-2 border-b border-gray-700">
+                  <button
+                    onClick={() => setLocalViewMode(null)}
+                    className="flex items-center gap-2 text-purple-400 hover:text-purple-300 text-xs"
+                  >
+                    <BookOpen size={14} />
+                    Switch to Understanding View
+                  </button>
+                </div>
+              )}
               {lines.map((line, i) => {
                 const lineNumber = i + 1;
                 const isExecuted = data.executedLines?.has(lineNumber);

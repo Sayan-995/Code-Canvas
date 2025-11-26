@@ -39,12 +39,15 @@ export interface GitHubTreeNode {
   sha: string;
 }
 
+export type ViewMode = 'full' | 'understanding';
+
 export interface CachedRepoData {
   segments: FileSegment[];
   allFiles: FileStructure[]; // Fetched files cached
   selectedCategories: Set<string>;
   // For GitHub lazy loading
   pendingTree?: GitHubTreeNode[]; // Files not yet fetched
+  viewMode: ViewMode;
 }
 
 interface FileStore {
@@ -66,6 +69,7 @@ interface FileStore {
   setCachedRepoData: (data: CachedRepoData | null) => void;
   switchSegments: (categories: Set<string>) => void;
   addToCache: (files: FileStructure[]) => void;
+  setViewMode: (mode: ViewMode) => void;
 }
 
 export const useFileStore = create<FileStore>((set) => ({
@@ -132,6 +136,12 @@ export const useFileStore = create<FileStore>((set) => ({
         ...state.cachedRepoData,
         allFiles: [...state.cachedRepoData.allFiles, ...newFiles]
       }
+    };
+  }),
+  setViewMode: (mode) => set((state) => {
+    if (!state.cachedRepoData) return {};
+    return {
+      cachedRepoData: { ...state.cachedRepoData, viewMode: mode }
     };
   }),
 }));

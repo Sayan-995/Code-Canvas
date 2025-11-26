@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { FileSegment } from '../store/useFileStore';
+import { FileSegment, ViewMode } from '../store/useFileStore';
 import { Check, ChevronDown, ChevronRight, Loader2, ArrowRight } from 'lucide-react';
+import { ViewModeSelector } from './ViewModeSelector';
 
 interface Props {
   segments: FileSegment[];
-  onConfirm: (selectedFiles: string[], selectedCategories: Set<string>) => void;
+  onConfirm: (selectedFiles: string[], selectedCategories: Set<string>, viewMode: ViewMode) => void;
   onBack: () => void;
   isLoading?: boolean;
 }
@@ -14,6 +15,8 @@ export const RepoSegmentSelector: React.FC<Props> = ({ segments, onConfirm, onBa
     new Set(segments.filter(s => s.category === 'Core Source Code').map(s => s.category))
   );
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
+  const [showViewModeSelector, setShowViewModeSelector] = useState(false);
+  const [selectedViewMode, setSelectedViewMode] = useState<ViewMode>('full');
 
   const toggleSegment = (category: string) => {
     const newSelected = new Set(selectedSegments);
@@ -36,10 +39,25 @@ export const RepoSegmentSelector: React.FC<Props> = ({ segments, onConfirm, onBa
   };
 
   const handleConfirm = () => {
+    // If Core Source Code is selected, show view mode selector
+    if (selectedSegments.has('Core Source Code')) {
+      setShowViewModeSelector(true);
+    } else {
+      proceedWithConfirm('full');
+    }
+  };
+
+  const proceedWithConfirm = (viewMode: ViewMode) => {
     const selectedFiles = segments
       .filter(s => selectedSegments.has(s.category))
       .flatMap(s => s.files);
-    onConfirm(selectedFiles, selectedSegments);
+    setShowViewModeSelector(false);
+    onConfirm(selectedFiles, selectedSegments, viewMode);
+  };
+
+  const handleViewModeSelect = (mode: ViewMode) => {
+    setSelectedViewMode(mode);
+    proceedWithConfirm(mode);
   };
 
   const totalFiles = segments.reduce((acc, s) => acc + s.files.length, 0);
@@ -53,6 +71,11 @@ export const RepoSegmentSelector: React.FC<Props> = ({ segments, onConfirm, onBa
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-6">
+      <ViewModeSelector
+        isOpen={showViewModeSelector}
+        onClose={() => setShowViewModeSelector(false)}
+        onSelect={handleViewModeSelect}
+      />
       <div className="w-full max-w-3xl">
         <h1 className="text-3xl font-bold mb-2">Select Code Segments</h1>
         <p className="text-gray-400 mb-6">

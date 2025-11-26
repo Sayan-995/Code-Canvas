@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useFileStore, FileStructure, FileSegment } from '../store/useFileStore';
+import { useFileStore, FileStructure, FileSegment, ViewMode } from '../store/useFileStore';
 import { Github, FolderUp, Loader2 } from 'lucide-react';
 import { Octokit } from '@octokit/rest';
 import { analyzeCode } from '../utils/codeAnalyzer';
@@ -21,6 +21,8 @@ interface PendingGitHubData {
   octokit: Octokit;
 }
 
+const VIDEO_WATCHED_KEY = 'code_canvas_video_watched';
+
 export const UploadScreen: React.FC = () => {
   const { setFiles, setGitHubContext, setCachedRepoData } = useFileStore();
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,10 @@ export const UploadScreen: React.FC = () => {
   const [repoUrl, setRepoUrl] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [error, setError] = useState('');
-  const [videoEnded, setVideoEnded] = useState(false);
+  
+  // Check if user has already watched the video
+  const hasWatchedVideo = () => localStorage.getItem(VIDEO_WATCHED_KEY) === 'true';
+  const [videoEnded, setVideoEnded] = useState(hasWatchedVideo());
   
   // Segmentation state
   const [segments, setSegments] = useState<FileSegment[] | null>(null);
@@ -154,7 +159,7 @@ export const UploadScreen: React.FC = () => {
   };
 
 
-  const handleSegmentConfirm = async (selectedFiles: string[], selectedCategories: Set<string>) => {
+  const handleSegmentConfirm = async (selectedFiles: string[], selectedCategories: Set<string>, viewMode: ViewMode) => {
     setIsLoadingSelected(true);
     
     try {
@@ -167,7 +172,8 @@ export const UploadScreen: React.FC = () => {
         setCachedRepoData({
           segments,
           allFiles: analyzed,
-          selectedCategories
+          selectedCategories,
+          viewMode
         });
       } else if (pendingGitHubData && segments) {
         // GitHub - fetch only selected files initially, store tree for lazy loading
@@ -202,6 +208,7 @@ export const UploadScreen: React.FC = () => {
           segments,
           allFiles: analyzed,
           selectedCategories,
+          viewMode,
           pendingTree: pendingTree.map(n => ({ path: n.path, sha: n.sha }))
         });
         setGitHubContext({ owner, repo, branch, token: githubToken, sha });
@@ -237,16 +244,33 @@ export const UploadScreen: React.FC = () => {
     <div className="relative flex flex-col items-center justify-center h-screen text-white p-4 overflow-hidden">
       {/* Background Video - plays once at normal speed during loading */}
       {loading && !videoEnded && (
-        <video
-          autoPlay
-          muted
-          playsInline
-          onEnded={() => setVideoEnded(true)}
-          className="absolute inset-0 w-full h-full object-cover z-0"
-          style={{ filter: 'brightness(0.8)' }}
-        >
-          <source src="/kiro_bg_2.mp4" type="video/mp4" />
-        </video>
+        <div className="absolute inset-0 flex items-center justify-center z-0 p-6 md:p-12">
+          <video
+            autoPlay
+            muted
+            playsInline
+            onEnded={() => {
+              localStorage.setItem(VIDEO_WATCHED_KEY, 'true');
+              setVideoEnded(true);
+            }}
+            className="rounded-lg shadow-2xl"
+            style={{ 
+              filter: 'brightness(0.9)',
+              maxWidth: 'calc(100% - 48px)',
+              maxHeight: 'calc(100% - 48px)',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain',
+              margin: 'auto'
+            }}
+            onLoadedMetadata={(e) => {
+              const video = e.currentTarget;
+              video.playbackRate = 1.2;
+            }}
+          >
+            <source src="/kiro_bg_2.mp4" type="video/mp4" />
+          </video>
+        </div>
       )}
 
       {/* Dark overlay after video ends but still loading */}
@@ -269,9 +293,9 @@ export const UploadScreen: React.FC = () => {
 
       {/* Content overlay */}
       <div className="relative z-10 flex flex-col items-center w-full">
-        <h1 className={`text-4xl font-bold mb-8 transition-all duration-500 ${loading ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
+        {/* <h1 className={`text-4xl font-bold mb-8 transition-all duration-500 ${loading ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
           Code Canvas
-        </h1>
+        </h1> */}
         
         <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl transition-all duration-500 ${loading ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
         {/* Local Upload */}

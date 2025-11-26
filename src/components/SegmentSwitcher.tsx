@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { useFileStore, FileStructure } from '../store/useFileStore';
-import { Layers, Check, ChevronDown, X, Loader2 } from 'lucide-react';
+import { Layers, Check, ChevronDown, X, Loader2, BookOpen, Code } from 'lucide-react';
 import { Octokit } from '@octokit/rest';
 import { analyzeCode } from '../utils/codeAnalyzer';
 
 export const SegmentSwitcher: React.FC = () => {
-  const { cachedRepoData, switchSegments, githubContext, addToCache, setFiles } = useFileStore();
+  const { cachedRepoData, switchSegments, githubContext, addToCache, setFiles, setViewMode } = useFileStore();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   if (!cachedRepoData) return null;
 
-  const { segments, selectedCategories, allFiles, pendingTree } = cachedRepoData;
+  const { segments, selectedCategories, allFiles, pendingTree, viewMode } = cachedRepoData;
+  const hasCoreCode = selectedCategories.has('Core Source Code');
 
   const getLanguage = (filename: string) => {
     if (filename.endsWith('.tsx') || filename.endsWith('.ts')) return 'typescript';
@@ -121,6 +122,37 @@ export const SegmentSwitcher: React.FC = () => {
               <X size={16} />
             </button>
           </div>
+          
+          {/* View Mode Toggle - only show if Core Source Code is selected */}
+          {hasCoreCode && (
+            <div className="p-3 border-b border-gray-700">
+              <div className="text-xs text-gray-400 mb-2">View Mode</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setViewMode('understanding')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs flex items-center justify-center gap-2 transition-colors ${
+                    viewMode === 'understanding' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  <BookOpen size={14} />
+                  Understanding
+                </button>
+                <button
+                  onClick={() => setViewMode('full')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs flex items-center justify-center gap-2 transition-colors ${
+                    viewMode === 'full' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  <Code size={14} />
+                  Full Code
+                </button>
+              </div>
+            </div>
+          )}
           <div className="max-h-80 overflow-y-auto">
             {segments.map((segment) => {
               const isSelected = selectedCategories.has(segment.category);
