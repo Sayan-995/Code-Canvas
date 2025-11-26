@@ -34,7 +34,11 @@ type FlowStep =
   | { type: 'highlight-return'; file: string; lines: number[] }
   | { type: 'highlight-endpoint'; file: string; line: number }
   | { type: 'animate-edge'; fromFile: string; toFile: string; fromLine: number; toFunc: string }
-  | { type: 'return-edge'; fromFile: string; toFile: string; fromFunc: string; toLine: number };
+  | { type: 'return-edge'; fromFile: string; toFile: string; fromFunc: string; toLine: number }
+  | { type: 'execute-line'; file: string; line: number }
+  | { type: 'animate-edge-with-dot'; fromFile: string; toFile: string; fromLine: number; toFunc: string }
+  | { type: 'return-edge-with-dot'; fromFile: string; toFile: string; fromFunc: string; toLine: number }
+  | { type: 'prepare-return'; file: string; func: string };
 
 interface CodeCanvasProps {
   files: FileStructure[];
@@ -49,7 +53,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const { drawings, addDrawing, setDrawings } = useFileStore();
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState<{x:number, y:number}[]>([]);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, setCenter } = useReactFlow();
   const { x, y, zoom } = useViewport();
 
   // Drawing Options
@@ -61,6 +65,13 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const [flowPath, setFlowPath] = useState<FlowStep[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlayingFlow, setIsPlayingFlow] = useState(false);
+  const [executedLines, setExecutedLines] = useState<Map<string, Set<number>>>(new Map());
+  const [flowSpeed, setFlowSpeed] = useState(0.5);
+  const [dotProgress, setDotProgress] = useState(0);
+  const animationFrameRef = useRef<number | null>(null);
+  const [speedBarPosition, setSpeedBarPosition] = useState({ x: window.innerWidth - 280, y: 16 });
+  const [isDraggingSpeedBar, setIsDraggingSpeedBar] = useState(false);
+  const speedBarRef = useRef<HTMLDivElement>(null);
 
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -105,6 +116,30 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
+
+  // Handle speed bar dragging
+  useEffect(() => {
+    if (!isDraggingSpeedBar) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setSpeedBarPosition({
+        x: Math.max(0, Math.min(window.innerWidth - 280, e.clientX - 140)),
+        y: Math.max(0, Math.min(window.innerHeight - 60, e.clientY - 20))
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSpeedBar(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingSpeedBar]);
 
   // Sync drawings to nodes
   useEffect(() => {
@@ -267,57 +302,56 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
       if (visited.has(key)) return;
       visited.add(key);
 
-      // 1. Highlight Definition
-      steps.push({ type: 'highlight-def', file: currentFile, func: currentFunc });
-
       const fileData = files.find(f => f.path === currentFile);
       if (!fileData?.analysis) return;
       const funcInfo = fileData.analysis.functions.find(f => f.name === currentFunc);
       if (!funcInfo) return;
 
-      // 2. Process calls
-      for (const call of funcInfo.calls) {
-        const targetFile = files.find(f => 
-          f.analysis?.functions.some(func => func.name === call.name)
-        );
-
-        if (targetFile) {
-          // Highlight the call site
-          steps.push({ type: 'highlight-call', file: currentFile, line: call.line });
+      // Execute line by line
+      for (let lineNum = funcInfo.startLine; lineNum <= funcInfo.endLine; lineNum++) {
+        const callAtLine = funcInfo.calls.find(c => c.line === lineNum);
+        
+        if (callAtLine) {
+          // Execute the line with the call
+          steps.push({ type: 'execute-line', file: currentFile, line: lineNum });
           
-          // Animate edge to target
-          steps.push({ 
-            type: 'animate-edge', 
-            fromFile: currentFile, 
-            toFile: targetFile.path, 
-            fromLine: call.line, 
-            toFunc: call.name 
-          });
+          // Find target file
+          const targetFile = files.find(f => 
+            f.analysis?.functions.some(func => func.name === callAtLine.name)
+          );
 
-          // Recurse
-          traverse(targetFile.path, call.name);
-          
-          // Highlight returns in the called function before returning
-          const calledFunc = targetFile.analysis?.functions.find(f => f.name === call.name);
-          if (calledFunc && calledFunc.returns && calledFunc.returns.length > 0) {
-             steps.push({
-                 type: 'highlight-return',
-                 file: targetFile.path,
-                 lines: calledFunc.returns
-             });
+          if (targetFile) {
+            // Animate edge with dot to target
+            steps.push({ 
+              type: 'animate-edge-with-dot', 
+              fromFile: currentFile, 
+              toFile: targetFile.path, 
+              fromLine: lineNum, 
+              toFunc: callAtLine.name 
+            });
+
+            // Recurse into called function
+            traverse(targetFile.path, callAtLine.name);
+            
+            // Prepare for return - smooth zoom out
+            steps.push({
+              type: 'prepare-return',
+              file: targetFile.path,
+              func: callAtLine.name
+            });
+            
+            // Return edge with dot back
+            steps.push({
+              type: 'return-edge-with-dot',
+              fromFile: targetFile.path,
+              toFile: currentFile,
+              fromFunc: callAtLine.name,
+              toLine: lineNum
+            });
           }
-
-          // Return edge (Data returning)
-          steps.push({
-            type: 'return-edge',
-            fromFile: targetFile.path,
-            toFile: currentFile,
-            fromFunc: call.name,
-            toLine: call.line
-          });
-
-          // Return focus to current file
-          steps.push({ type: 'highlight-def', file: currentFile, func: currentFunc });
+        } else {
+          // Regular line execution
+          steps.push({ type: 'execute-line', file: currentFile, line: lineNum });
         }
       }
     };
@@ -380,7 +414,13 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const handleTrackFlow = useCallback((name: string, path: string, type: 'func' | 'endpoint' = 'func') => {
     const pathSteps = generateFlowPath(path, name, type);
     if (pathSteps.length > 0) {
-      setFlowPath(pathSteps);
+      // Add initial prepare step for smooth zoom-out at start
+      const stepsWithPrepare: FlowStep[] = [
+        { type: 'prepare-return', file: path, func: name },
+        ...pathSteps
+      ];
+      
+      setFlowPath(stepsWithPrepare);
       setCurrentStepIndex(0);
       setIsPlayingFlow(true);
       setSelectedFunction(null); // Clear selection to focus on flow
@@ -392,33 +432,188 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
     if (!isPlayingFlow || flowPath.length === 0) return;
 
     const step = flowPath[currentStepIndex];
-    // Dynamic duration based on step type
-    let duration = 1000;
-    if (step.type === 'animate-edge') {
-        duration = 2500; // 2s animation + buffer
-    } else if (step.type === 'return-edge') {
-        duration = 2500; // 2s animation + buffer
-    } else if (step.type === 'highlight-return') {
-        duration = 800; // Slightly longer to see the returns
-    } else if (step.type === 'highlight-endpoint') {
-        duration = 800;
-    } else {
-        duration = 300; // Faster for function highlighting
+    
+    // Handle different step types
+    if (step.type === 'execute-line') {
+      // Add line to executed set
+      setExecutedLines(prev => {
+        const newMap = new Map(prev);
+        const fileLines = newMap.get(step.file) || new Set();
+        fileLines.add(step.line);
+        newMap.set(step.file, fileLines);
+        return newMap;
+      });
+      
+      // Pan camera to the line
+      const node = nodesRef.current.find(n => n.id === step.file);
+      if (node) {
+        const nodeWidth = node.width || 500;
+        const lineOffset = (step.line - 1) * 20; // Approximate line height
+        
+        // Shift center slightly right to account for line numbers and left padding
+        // This ensures line numbers are visible and reduces right-side space
+        const centerX = node.position.x + nodeWidth * 0.45; // Shift left from center
+        const centerY = node.position.y + lineOffset + 100;
+        
+        setCenter(centerX, centerY, { duration: 150 / flowSpeed, zoom: 1.1 });
+      }
+      
+      // Move to next step
+      const timer = setTimeout(() => {
+        if (currentStepIndex < flowPath.length - 1) {
+          setCurrentStepIndex(prev => prev + 1);
+        } else {
+          finishFlow();
+        }
+      }, 180 / flowSpeed);
+      
+      return () => clearTimeout(timer);
+      
+    } else if (step.type === 'prepare-return') {
+      // Smooth zoom out before returning or starting
+      const node = nodesRef.current.find(n => n.id === step.file);
+      if (node) {
+        const nodeWidth = node.width || 500;
+        const nodeHeight = node.height || 400;
+        const centerX = node.position.x + nodeWidth * 0.45;
+        const centerY = node.position.y + nodeHeight / 2;
+        
+        // Smoothly zoom out to show the whole function
+        setCenter(centerX, centerY, { duration: 500 / flowSpeed, zoom: 0.75 });
+      }
+      
+      // Wait for zoom animation to complete with extra pause for smoothness
+      const timer = setTimeout(() => {
+        if (currentStepIndex < flowPath.length - 1) {
+          setCurrentStepIndex(prev => prev + 1);
+        } else {
+          finishFlow();
+        }
+      }, 700 / flowSpeed);
+      
+      return () => clearTimeout(timer);
+      
+    } else if (step.type === 'animate-edge-with-dot' || step.type === 'return-edge-with-dot') {
+      // Animate red dot along the edge
+      const sourceNode = nodesRef.current.find(n => n.id === step.fromFile);
+      const targetNode = nodesRef.current.find(n => n.id === step.toFile);
+      
+      if (sourceNode && targetNode) {
+        const isReturn = step.type === 'return-edge-with-dot';
+        let progress = 0;
+        const duration = isReturn ? 2200 / flowSpeed : 2500 / flowSpeed; // Slightly slower return for smoothness
+        const startTime = Date.now();
+        
+        // Calculate center points of nodes for better positioning
+        const sourceWidth = sourceNode.width || 500;
+        const sourceHeight = sourceNode.height || 400;
+        const targetWidth = targetNode.width || 500;
+        const targetHeight = targetNode.height || 400;
+        
+        // Calculate source and target positions
+        const sourceCenterX = sourceNode.position.x + sourceWidth * 0.45;
+        const sourceCenterY = sourceNode.position.y + sourceHeight / 2;
+        const targetCenterX = targetNode.position.x + targetWidth * 0.45;
+        
+        // For calls, calculate target as function head; for returns, use center
+        let targetCenterY = targetNode.position.y + targetHeight / 2;
+        
+        if (!isReturn) {
+          // For calls, aim for function head from the start
+          const targetFileData = files.find(f => f.path === step.toFile);
+          const targetFunc = targetFileData?.analysis?.functions.find(f => f.name === step.toFunc);
+          if (targetFunc) {
+            const firstLineOffset = (targetFunc.startLine - 1) * 20;
+            targetCenterY = targetNode.position.y + firstLineOffset + 100;
+          }
+        }
+        
+        // Determine appropriate zoom based on distance
+        const distance = Math.sqrt(
+          Math.pow(targetCenterX - sourceCenterX, 2) + 
+          Math.pow(targetCenterY - sourceCenterY, 2)
+        );
+        const appropriateZoom = distance > 1500 ? 0.6 : distance > 1000 ? 0.7 : 0.8;
+        
+        const animate = () => {
+          const elapsed = Date.now() - startTime;
+          progress = Math.min(elapsed / duration, 1);
+          
+          // Smoother ease-in-out cubic
+          const eased = progress < 0.5
+            ? 4 * progress * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+          
+          // Interpolate position along the path with easing
+          const x = sourceCenterX + (targetCenterX - sourceCenterX) * eased;
+          const y = sourceCenterY + (targetCenterY - sourceCenterY) * eased;
+          
+          setDotProgress(progress);
+          
+          // Gradually zoom in as we approach target
+          const currentZoom = appropriateZoom + (1.1 - appropriateZoom) * eased;
+          
+          // Smooth camera follow - stays centered on the dot
+          setCenter(x, y, { duration: 0, zoom: currentZoom });
+          
+          if (progress < 1) {
+            animationFrameRef.current = requestAnimationFrame(animate);
+          } else {
+            // Arrived at target
+            setDotProgress(0);
+            
+            // Different handling for return vs call
+            if (isReturn) {
+              // For returns, we're already at the right position, just continue
+              setTimeout(() => {
+                if (currentStepIndex < flowPath.length - 1) {
+                  setCurrentStepIndex(prev => prev + 1);
+                } else {
+                  finishFlow();
+                }
+              }, 300 / flowSpeed);
+            } else {
+              // For calls, we're already at function head, just pause briefly
+              setTimeout(() => {
+                if (currentStepIndex < flowPath.length - 1) {
+                  setCurrentStepIndex(prev => prev + 1);
+                } else {
+                  finishFlow();
+                }
+              }, 400 / flowSpeed);
+            }
+          }
+        };
+        
+        animate();
+        
+        return () => {
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+          }
+        };
+      }
     }
-
+    
+    // Fallback for other step types
     const timer = setTimeout(() => {
       if (currentStepIndex < flowPath.length - 1) {
         setCurrentStepIndex(prev => prev + 1);
       } else {
-        setIsPlayingFlow(false);
-        setCurrentStepIndex(0);
-        setFlowPath([]);
-        setEdges(prev => prev.filter(e => !e.id.startsWith('flow-')));
+        finishFlow();
       }
-    }, duration);
-
+    }, 300 / flowSpeed);
+    
     return () => clearTimeout(timer);
-  }, [isPlayingFlow, currentStepIndex, flowPath]);
+  }, [isPlayingFlow, currentStepIndex, flowPath, flowSpeed]);
+  
+  const finishFlow = () => {
+    setIsPlayingFlow(false);
+    setCurrentStepIndex(0);
+    setFlowPath([]);
+    setExecutedLines(new Map());
+    setEdges(prev => prev.filter(e => !e.id.startsWith('flow-')));
+  };
 
   // Update Nodes and Edges based on current step
   useEffect(() => {
@@ -428,7 +623,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
             if (n.type === 'drawingNode') return n;
             return {
                 ...n,
-                data: { ...n.data, activeFlowLine: null, activeFlowFunction: null }
+                data: { ...n.data, executedLines: new Set() }
             };
         }));
         return;
@@ -436,51 +631,33 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
 
     const step = flowPath[currentStepIndex];
 
-    // Update Nodes
+    // Update Nodes with executed lines
     setNodes(prev => prev.map(n => {
       if (n.type === 'drawingNode') return n;
-      const newData = { ...n.data, activeFlowLine: null, activeFlowFunction: null, activeReturnLines: null };
-      
-      if (step.type === 'highlight-def' && n.id === step.file) {
-        newData.activeFlowFunction = step.func;
-      } else if (step.type === 'highlight-call' && n.id === step.file) {
-        newData.activeFlowLine = step.line;
-      } else if (step.type === 'animate-edge' && n.id === step.fromFile) {
-         newData.activeFlowLine = step.fromLine;
-      } else if (step.type === 'highlight-return' && n.id === step.file) {
-         newData.activeReturnLines = step.lines;
-      } else if (step.type === 'highlight-endpoint' && n.id === step.file) {
-         newData.activeFlowLine = step.line;
-      }
-
-      return { ...n, data: newData };
+      const fileExecutedLines = executedLines.get(n.id) || new Set();
+      return {
+        ...n,
+        data: { ...n.data, executedLines: fileExecutedLines }
+      };
     }));
 
-    // Update Edges
-    if (step.type === 'animate-edge' || step.type === 'return-edge') {
+    // Update Edges for arrow animations
+    if (step.type === 'animate-edge-with-dot' || step.type === 'return-edge-with-dot') {
       const currentNodes = nodesRef.current;
       const sourceNode = currentNodes.find(n => n.id === step.fromFile);
       const targetNode = currentNodes.find(n => n.id === step.toFile);
       const isTargetRight = (sourceNode?.position.x || 0) < (targetNode?.position.x || 0);
 
-      const isReturn = step.type === 'return-edge';
-      // For return edge: source is the called function (def), target is the caller (call site)
-      // For call edge: source is the caller (call site), target is the called function (def)
+      const isReturn = step.type === 'return-edge-with-dot';
       
       let sourceHandle, targetHandle;
       let edgeId;
 
       if (isReturn) {
-         // Returning FROM function def TO call site
-         // step.fromFunc is the function name we are returning from
-         // step.toLine is the line we are returning to
          sourceHandle = `def-return-${step.fromFunc}-${isTargetRight ? 'right' : 'left'}`;
          targetHandle = `call-return-${step.fromFunc}-${step.toLine}-${isTargetRight ? 'left' : 'right'}`;
          edgeId = `flow-return-${step.fromFile}-${step.toFile}-${step.fromFunc}`;
       } else {
-         // Calling FROM call site TO function def
-         // step.toFunc is the function we are calling
-         // step.fromLine is the line we are calling from
          sourceHandle = `call-${step.toFunc}-${step.fromLine}-${isTargetRight ? 'right' : 'left'}`;
          targetHandle = `def-${step.toFunc}-${isTargetRight ? 'left' : 'right'}`;
          edgeId = `flow-call-${step.fromFile}-${step.toFile}-${step.toFunc}`;
@@ -496,10 +673,10 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
           targetHandle,
           type: 'flowEdge',
           animated: false, 
-          data: { isReturning: isReturn },
+          data: { isReturning: isReturn, dotProgress },
           style: { 
-              stroke: isReturn ? '#e879f9' : '#22d3ee', // Brighter Purple (fuchsia-400) for return, Cyan for call
-              strokeWidth: 3, // Thicker for both
+              stroke: isReturn ? '#e879f9' : '#22d3ee',
+              strokeWidth: 3,
           }, 
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -507,16 +684,9 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
           },
         }];
       });
-    } else {
-        // Keep existing flow edges or clear them? 
-        // Let's keep the last flow edge until a new one appears or flow ends
-        // Actually, better to clear flow edges when not in animate-edge step to avoid clutter?
-        // Or keep them to show the path?
-        // Let's clear them for now to focus on the "current" movement
-        // setEdges(prev => prev.filter(e => !e.id.startsWith('flow-edge-')));
     }
 
-  }, [isPlayingFlow, currentStepIndex, flowPath, setNodes, setEdges]);
+  }, [isPlayingFlow, currentStepIndex, flowPath, executedLines, dotProgress, setNodes, setEdges]);
 
   const createEdges = useCallback((name: string, type: 'def' | 'call', sourcePath: string) => {
     // ...existing code...
@@ -621,7 +791,25 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
         // If node exists, keep its position, otherwise calculate initial position
         const position = existingNode 
           ? existingNode.position 
-          : { x: (index % 4) * 600, y: Math.floor(index / 4) * 800 };
+          : (() => {
+              // Create a more organic scattered layout
+              const cols = Math.ceil(Math.sqrt(files.length * 1.5)); // Wider spread
+              const row = Math.floor(index / cols);
+              const col = index % cols;
+              
+              // Base position with more spacing
+              const baseX = col * 700;
+              const baseY = row * 900;
+              
+              // Add controlled randomness for organic feel
+              const offsetX = (Math.random() - 0.5) * 250;
+              const offsetY = (Math.random() - 0.5) * 250;
+              
+              return {
+                x: baseX + offsetX,
+                y: baseY + offsetY
+              };
+            })();
 
         return {
           id: file.path,
@@ -720,6 +908,15 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
           animation: draw-line 2s ease-out forwards;
           opacity: 0; /* Start hidden, animate to 1 */
         }
+        
+        @keyframes pulse-once {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.7; }
+        }
+        
+        .animate-pulse-once {
+          animation: pulse-once 0.3s ease-in-out;
+        }
       `}</style>
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <button 
@@ -751,6 +948,42 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
           {status === 'connected' ? 'Share' : 'Connecting...'}
         </button>
       </div>
+
+      {isPlayingFlow && (
+        <div 
+          ref={speedBarRef}
+          className="absolute z-50 bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center gap-3 shadow-xl cursor-move"
+          style={{ 
+            left: `${speedBarPosition.x}px`, 
+            top: `${speedBarPosition.y}px`,
+            userSelect: 'none'
+          }}
+          onMouseDown={(e) => {
+            if (e.target === speedBarRef.current || (e.target as HTMLElement).tagName === 'SPAN') {
+              setIsDraggingSpeedBar(true);
+              e.preventDefault();
+            }
+          }}
+        >
+          <span className="text-white text-sm cursor-move">Flow Speed:</span>
+          <input 
+            type="range" 
+            min="0.25" 
+            max="3" 
+            step="0.25"
+            value={flowSpeed} 
+            onChange={(e) => setFlowSpeed(parseFloat(e.target.value))}
+            className="w-32 accent-blue-500 cursor-pointer"
+          />
+          <span className="text-white text-sm font-mono cursor-move">{flowSpeed}x</span>
+          <button
+            onClick={finishFlow}
+            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm cursor-pointer"
+          >
+            Stop
+          </button>
+        </div>
+      )}
 
       {isDrawing && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-gray-800 border border-gray-700 rounded-lg p-1 flex items-center gap-2 shadow-xl">
