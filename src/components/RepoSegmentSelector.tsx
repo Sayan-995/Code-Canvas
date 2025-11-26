@@ -16,7 +16,6 @@ export const RepoSegmentSelector: React.FC<Props> = ({ segments, onConfirm, onBa
   );
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
   const [showViewModeSelector, setShowViewModeSelector] = useState(false);
-  const [selectedViewMode, setSelectedViewMode] = useState<ViewMode>('full');
 
   const toggleSegment = (category: string) => {
     const newSelected = new Set(selectedSegments);
@@ -56,7 +55,6 @@ export const RepoSegmentSelector: React.FC<Props> = ({ segments, onConfirm, onBa
   };
 
   const handleViewModeSelect = (mode: ViewMode) => {
-    setSelectedViewMode(mode);
     proceedWithConfirm(mode);
   };
 
