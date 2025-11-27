@@ -16,11 +16,11 @@ import { FileStructure, useFileStore, Drawing } from '../store/useFileStore';
 import { FileNode } from './FileNode';
 import { FlowEdge } from './FlowEdge';
 import { DrawingNode } from './DrawingNode';
-import { PenTool, MousePointer2, Eraser, Circle, Square, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic, MessageSquare } from 'lucide-react';
+import { PenTool, MousePointer2, Eraser, Palette, Circle, Square, Share, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic, FolderTree } from 'lucide-react';
 import { useCollaboration } from '../hooks/useCollaboration';
 import { CodeSearchEngine } from '../services/searchEngine';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
-import { Chat } from './Chat';
+import { FileTreeView } from './FileTreeView';
 
 const nodeTypes = {
   fileNode: FileNode,
@@ -95,6 +95,9 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [username, setUsername] = useState('');
 
+  // File Tree View State
+  const [isTreeViewOpen, setIsTreeViewOpen] = useState(false);
+  
   useEffect(() => {
     const animals = ['Penguin', 'Badger', 'Capybara', 'Dolphin', 'Eagle', 'Fox', 'Giraffe', 'Hedgehog', 'Iguana', 'Jaguar', 'Koala', 'Lemur', 'Meerkat', 'Narwhal', 'Octopus', 'Panda', 'Quokka', 'Rabbit', 'Sloth', 'Tiger', 'Unicorn', 'Vulture', 'Walrus', 'Xerus', 'Yak', 'Zebra'];
     const adjectives = ['Happy', 'Sleepy', 'Grumpy', 'Sneezy', 'Dopey', 'Bashful', 'Doc', 'Swift', 'Lazy', 'Brave', 'Calm', 'Eager', 'Fancy', 'Gentle', 'Jolly', 'Kind', 'Lively', 'Nice', 'Proud', 'Silly', 'Witty', 'Zany'];
@@ -1001,6 +1004,24 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
     setEdges(prev => prev.filter(e => !e.id.startsWith('edge-')));
   }, [setEdges]);
 
+  // Handle file click from tree view - navigate to the file node on canvas
+  const handleTreeFileClick = useCallback((path: string) => {
+    const targetNode = nodesRef.current.find(n => n.type === 'fileNode' && n.id === path);
+    if (targetNode) {
+      const nodeWidth = targetNode.width || 500;
+      const nodeHeight = targetNode.height || 400;
+      const centerX = targetNode.position.x + nodeWidth * 0.45;
+      const centerY = targetNode.position.y + nodeHeight / 2;
+      
+      // Highlight the file temporarily
+      setHighlightedFiles(new Set([path]));
+      setTimeout(() => setHighlightedFiles(new Set()), 2000);
+      
+      // Navigate to the file
+      setCenter(centerX, centerY, { duration: 500, zoom: 1.0 });
+    }
+  }, [setCenter]);
+
   useEffect(() => {
     if (files.length === 0) return;
 
@@ -1192,6 +1213,18 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
         >
           <LinkIcon size={18} />
           {status === 'connected' ? 'Share' : 'Connecting...'}
+        </button>
+        <button
+          onClick={() => setIsTreeViewOpen(!isTreeViewOpen)}
+          className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
+            isTreeViewOpen 
+              ? 'bg-blue-600 border-blue-500 text-white' 
+              : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+          }`}
+          title="Toggle File Tree"
+        >
+          <FolderTree size={18} />
+          File Tree
         </button>
       </div>
 
@@ -1416,6 +1449,14 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
             </g>
         </svg>
       </ReactFlow>
+
+      {/* File Tree View */}
+      <FileTreeView
+        files={files}
+        onFileClick={handleTreeFileClick}
+        isOpen={isTreeViewOpen}
+        onClose={() => setIsTreeViewOpen(false)}
+      />
 
       {/* Search Input Bar with Tabs */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
