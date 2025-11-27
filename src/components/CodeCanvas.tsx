@@ -16,11 +16,12 @@ import { FileStructure, useFileStore, Drawing } from '../store/useFileStore';
 import { FileNode } from './FileNode';
 import { FlowEdge } from './FlowEdge';
 import { DrawingNode } from './DrawingNode';
-import { PenTool, MousePointer2, Eraser, Palette, Circle, Square, Share, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic, FolderTree } from 'lucide-react';
+import { PenTool, MousePointer2, Eraser, Circle, Square, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic, FolderTree, MessageSquare } from 'lucide-react';
 import { useCollaboration } from '../hooks/useCollaboration';
 import { CodeSearchEngine } from '../services/searchEngine';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 import { FileTreeView } from './FileTreeView';
+import { Chat } from './Chat';
 
 const nodeTypes = {
   fileNode: FileNode,
