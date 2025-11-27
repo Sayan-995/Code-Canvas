@@ -4,9 +4,10 @@ import { UploadScreen } from './UploadScreen';
 import { CodeCanvas } from './CodeCanvas';
 import { ConflictResolver } from './ConflictResolver';
 import { SegmentSwitcher } from './SegmentSwitcher';
+import { AnalysisConfigPanel } from './AnalysisConfigPanel';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { Download, Github, Loader2, GitPullRequest } from 'lucide-react';
+import { Download, Github, Loader2, GitPullRequest, Settings } from 'lucide-react';
 import { Octokit } from '@octokit/rest';
 
 import { ExplanationPanel } from './ExplanationPanel';
@@ -25,6 +26,7 @@ export function CodeEditor() {
   const [showConflictResolver, setShowConflictResolver] = useState(false);
   const [pendingSha, setPendingSha] = useState<string | null>(null);
   const [isFlowPlaying, setIsFlowPlaying] = useState(false);
+  const [showAnalysisConfig, setShowAnalysisConfig] = useState(false);
 
   const handleDownload = async () => {
     const zip = new JSZip();
@@ -302,6 +304,13 @@ export function CodeEditor() {
                 <Download size={20} />
                 Download Zip
               </button>
+              <button
+                onClick={() => setShowAnalysisConfig(true)}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-lg"
+                title="Analysis Settings"
+              >
+                <Settings size={20} />
+              </button>
             </div>
           )}
           <SegmentSwitcher />
@@ -312,6 +321,10 @@ export function CodeEditor() {
             onFlowStateChange={setIsFlowPlaying}
           />
           <ExplanationPanel />
+          <AnalysisConfigPanel 
+            isOpen={showAnalysisConfig} 
+            onClose={() => setShowAnalysisConfig(false)} 
+          />
         </>
       )}
     </div>
