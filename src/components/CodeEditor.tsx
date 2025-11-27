@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useFileStore } from '../store/useFileStore';
 import { UploadScreen } from './UploadScreen';
 import { CodeCanvas } from './CodeCanvas';
@@ -8,6 +8,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { Download, Github, Loader2, GitPullRequest } from 'lucide-react';
 import { Octokit } from '@octokit/rest';
+import { io } from 'socket.io-client';
 
 import { ExplanationPanel } from './ExplanationPanel';
 
@@ -17,6 +18,8 @@ interface Conflict {
   remote: string;
 }
 
+const socket = io('http://localhost:3001');
+
 export function CodeEditor() {
   const { files, setFiles, updateFileContent, githubContext, markAllAsSynced, setGitHubContext, clearFiles } = useFileStore();
   const [isPushing, setIsPushing] = useState(false);
@@ -25,6 +28,57 @@ export function CodeEditor() {
   const [showConflictResolver, setShowConflictResolver] = useState(false);
   const [pendingSha, setPendingSha] = useState<string | null>(null);
   const [isFlowPlaying, setIsFlowPlaying] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const isRemoteUpdate = useRef(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlRoomId = params.get('room');
+
+    if (urlRoomId) {
+      setRoomId(urlRoomId);
+      setIsJoining(true);
+      socket.emit('join_room', urlRoomId);
+
+      socket.on('sync_files', (syncedFiles) => {
+        console.log('Received synced files:', syncedFiles);
+        isRemoteUpdate.current = true;
+        setFiles(syncedFiles);
+        setIsJoining(false);
+      });
+    }
+
+    return () => {
+      socket.off('sync_files');
+    };
+  }, []);
+
+  useEffect(() => {
+    if (files.length > 0 && !isJoining) {
+      if (isRemoteUpdate.current) {
+        isRemoteUpdate.current = false;
+        return;
+      }
+
+      let currentRoomId = roomId;
+      if (!currentRoomId) {
+        const params = new URLSearchParams(window.location.search);
+        currentRoomId = params.get('room');
+      }
+
+      if (!currentRoomId) {
+        currentRoomId = Math.random().toString(36).substring(7);
+        window.history.pushState({}, '', `?room=${currentRoomId}`);
+        setRoomId(currentRoomId);
+        socket.emit('join_room', currentRoomId);
+      } else if (currentRoomId !== roomId) {
+          setRoomId(currentRoomId);
+      }
+
+      socket.emit('upload_files', { roomId: currentRoomId, files });
+    }
+  }, [files, isJoining, roomId]);
 
   const handleDownload = async () => {
     const zip = new JSZip();
@@ -270,7 +324,14 @@ export function CodeEditor() {
       )}
       
       {files.length === 0 ? (
-        <UploadScreen />
+        isJoining ? (
+          <div className="flex items-center justify-center h-screen text-white">
+            <Loader2 className="animate-spin mr-2" size={48} />
+            <span className="text-xl">Joining Room...</span>
+          </div>
+        ) : (
+          <UploadScreen />
+        )
       ) : (
         <>
           {!isFlowPlaying && (
@@ -310,6 +371,7 @@ export function CodeEditor() {
             onBack={() => clearFiles()} 
             onFileUpdate={updateFileContent}
             onFlowStateChange={setIsFlowPlaying}
+            roomId={roomId}
           />
           <ExplanationPanel />
         </>

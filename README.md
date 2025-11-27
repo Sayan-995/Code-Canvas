@@ -11,17 +11,30 @@ A React + TypeScript application that visualizes your code files as floating nod
 
 ## Getting Started
 
-1.  Install dependencies:
+1.  Install frontend dependencies:
     ```bash
     npm install
     ```
 
-2.  Start the development server:
+2.  Install backend dependencies:
+    ```bash
+    cd backend
+    npm install
+    cd ..
+    ```
+
+3.  Start the backend server (in a separate terminal):
+    ```bash
+    cd backend
+    npm run dev
+    ```
+
+4.  Start the frontend development server (in a new terminal):
     ```bash
     npm run dev
     ```
 
-3.  Open your browser at `http://localhost:5173`.
+5.  Open your browser at `http://localhost:5173`.
 
 ## Technologies
 
@@ -32,3 +45,5 @@ A React + TypeScript application that visualizes your code files as floating nod
 - Tailwind CSS
 - Zustand
 - Octokit
+- Node.js & Express (Backend)
+- Socket.io (Real-time Chat)

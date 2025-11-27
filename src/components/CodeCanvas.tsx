@@ -16,10 +16,11 @@ import { FileStructure, useFileStore, Drawing } from '../store/useFileStore';
 import { FileNode } from './FileNode';
 import { FlowEdge } from './FlowEdge';
 import { DrawingNode } from './DrawingNode';
-import { PenTool, MousePointer2, Eraser, Palette, Circle, Square, Share, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic } from 'lucide-react';
+import { PenTool, MousePointer2, Eraser, Circle, Square, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic, MessageSquare } from 'lucide-react';
 import { useCollaboration } from '../hooks/useCollaboration';
 import { CodeSearchEngine } from '../services/searchEngine';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
+import { Chat } from './Chat';
 
 const nodeTypes = {
   fileNode: FileNode,
@@ -47,9 +48,10 @@ interface CodeCanvasProps {
   onBack: () => void;
   onFileUpdate: (path: string, newContent: string) => void;
   onFlowStateChange?: (isPlaying: boolean) => void;
+  roomId?: string | null;
 }
 
-const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpdate, onFlowStateChange }) => {
+const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpdate, onFlowStateChange, roomId: propRoomId }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
@@ -74,7 +76,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const animationFrameRef = useRef<number | null>(null);
 
   const [isSpacePressed, setIsSpacePressed] = useState(false);
-  const [roomId, setRoomId] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(propRoomId || null);
   
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,18 +91,32 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
   const [voiceStatus, setVoiceStatus] = useState<'ready' | 'listening' | 'processing'>('ready');
   
+  // Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [username, setUsername] = useState('');
+
   useEffect(() => {
-      const params = new URLSearchParams(window.location.search);
-      const room = params.get('room');
-      if (room) {
-          setRoomId(room);
-      } else {
-          const newRoom = Math.random().toString(36).substring(7);
-          setRoomId(newRoom);
-          const newUrl = window.location.pathname + '?room=' + newRoom;
-          window.history.replaceState(null, '', newUrl);
-      }
+    const animals = ['Penguin', 'Badger', 'Capybara', 'Dolphin', 'Eagle', 'Fox', 'Giraffe', 'Hedgehog', 'Iguana', 'Jaguar', 'Koala', 'Lemur', 'Meerkat', 'Narwhal', 'Octopus', 'Panda', 'Quokka', 'Rabbit', 'Sloth', 'Tiger', 'Unicorn', 'Vulture', 'Walrus', 'Xerus', 'Yak', 'Zebra'];
+    const adjectives = ['Happy', 'Sleepy', 'Grumpy', 'Sneezy', 'Dopey', 'Bashful', 'Doc', 'Swift', 'Lazy', 'Brave', 'Calm', 'Eager', 'Fancy', 'Gentle', 'Jolly', 'Kind', 'Lively', 'Nice', 'Proud', 'Silly', 'Witty', 'Zany'];
+    
+    const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
+    const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const randomNum = Math.floor(Math.random() * 10000);
+    
+    setUsername(`${randomAdjective} ${randomAnimal} ${randomNum}`);
   }, []);
+  
+  useEffect(() => {
+      if (propRoomId) {
+          setRoomId(propRoomId);
+      } else {
+          const params = new URLSearchParams(window.location.search);
+          const room = params.get('room');
+          if (room) {
+              setRoomId(room);
+          }
+      }
+  }, [propRoomId]);
 
   const { status, addDrawingToYjs, updateDrawingInYjs, removeDrawingFromYjs } = useCollaboration(roomId);
 
@@ -1178,6 +1194,28 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
           {status === 'connected' ? 'Share' : 'Connecting...'}
         </button>
       </div>
+
+      {/* Chat Toggle Button - Left Side Vertically Centered */}
+      <button
+        onClick={() => setIsChatOpen(!isChatOpen)}
+        className={`absolute left-0 top-1/2 -translate-y-1/2 z-50 p-3 rounded-r-lg border-y border-r transition-all flex items-center gap-2 shadow-lg ${
+          isChatOpen 
+            ? 'bg-blue-600 border-blue-500 text-white translate-x-0' 
+            : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700 -translate-x-1 hover:translate-x-0'
+        }`}
+        title="Toggle Chat"
+      >
+        <MessageSquare size={24} />
+        <span className={`text-base font-medium transition-all duration-300 overflow-hidden ${isChatOpen ? 'w-auto opacity-100 ml-2' : 'w-0 opacity-0'}`}>
+          Chat
+        </span>
+      </button>
+
+      {roomId && (
+        <div style={{ display: isChatOpen ? 'block' : 'none' }}>
+          <Chat roomId={roomId} username={username} onClose={() => setIsChatOpen(false)} />
+        </div>
+      )}
 
       {isPlayingFlow && (
         <div 
