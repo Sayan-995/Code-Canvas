@@ -23,6 +23,7 @@ import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 import { FileTreeView } from './FileTreeView';
 import { Chat } from './Chat';
 import { FullscreenTreeView } from './FullscreenTreeView';
+import { resolveOverlaps, areNodesReady } from '../utils/overlapResolver';
 
 const nodeTypes = {
   fileNode: FileNode,
@@ -101,6 +102,9 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const [isTreeViewOpen, setIsTreeViewOpen] = useState(false);
   const [isFullscreenTreeOpen, setIsFullscreenTreeOpen] = useState(false);
   const [isTreeDropdownOpen, setIsTreeDropdownOpen] = useState(false);
+  
+  // Overlap resolution state
+  const overlapResolvedRef = useRef(false);
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -986,6 +990,34 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   // Setup voice recognition
   const { transcript, isListening, isSupported, error: voiceError, startListening, stopListening } = useVoiceRecognition(handleVoiceCommand);
 
+  // Resolve overlaps after nodes are measured
+  useEffect(() => {
+    // Only run once after initial load and nodes are measured
+    if (overlapResolvedRef.current || !areNodesReady(nodes)) {
+      return;
+    }
+
+    // Resolve overlaps
+    const newPositions = resolveOverlaps(nodes);
+    
+    if (newPositions.size > 0) {
+      setNodes(prevNodes => 
+        prevNodes.map(node => {
+          const newPos = newPositions.get(node.id);
+          if (newPos) {
+            return {
+              ...node,
+              position: newPos,
+            };
+          }
+          return node;
+        })
+      );
+      
+      overlapResolvedRef.current = true;
+    }
+  }, [nodes, setNodes]);
+
   // Auto-start listening when switching to voice mode
   useEffect(() => {
     if (inputMode === 'voice' && isSupported && !isListening) {
@@ -1018,6 +1050,31 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
     setIsTreeDropdownOpen(false);
   }, [setEdges]);
 
+  // Handle node drag stop - check for overlaps after user moves a node
+  const onNodeDragStop = useCallback(() => {
+    // Wait a bit for React Flow to update positions, then check overlaps
+    setTimeout(() => {
+      if (areNodesReady(nodes)) {
+        const newPositions = resolveOverlaps(nodes);
+        
+        if (newPositions.size > 0) {
+          setNodes(prevNodes => 
+            prevNodes.map(node => {
+              const newPos = newPositions.get(node.id);
+              if (newPos) {
+                return {
+                  ...node,
+                  position: newPos,
+                };
+              }
+              return node;
+            })
+          );
+        }
+      }
+    }, 50);
+  }, [nodes, setNodes]);
+
   // Handle file click from tree view - navigate to the file node on canvas
   const handleTreeFileClick = useCallback((path: string) => {
     const targetNode = nodesRef.current.find(n => n.type === 'fileNode' && n.id === path);
@@ -1047,7 +1104,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
       const drawingNodes = prevNodes.filter(n => n.type === 'drawingNode');
 
       // Helper function to check if two nodes overlap
-      const checkOverlap = (pos1: {x: number, y: number}, pos2: {x: number, y: number}, minDistance: number = 650) => {
+      const checkOverlap = (pos1: {x: number, y: number}, pos2: {x: number, y: number}, minDistance: number = 800) => {
         const dx = pos1.x - pos2.x;
         const dy = pos1.y - pos2.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1068,17 +1125,17 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
               const row = Math.floor(index / cols);
               const col = index % cols;
               
-              // Base position with more spacing (increased from 700/900 to 800/1000)
-              const baseX = col * 800;
-              const baseY = row * 1000;
+              // Base position with more spacing for better breathing room
+              const baseX = col * 1000; // Increased from 800
+              const baseY = row * 1200; // Increased from 1000
               
               let attempts = 0;
               let newPos = { x: baseX, y: baseY };
               
-              // Try to find non-overlapping position
+              // Try to find non-overlapping position with organic variation
               while (attempts < 10) {
-                const offsetX = (Math.random() - 0.5) * 200; // Reduced randomness for better spacing
-                const offsetY = (Math.random() - 0.5) * 200;
+                const offsetX = (Math.random() - 0.5) * 300; // Increased variation for more organic feel
+                const offsetY = (Math.random() - 0.5) * 300;
                 
                 newPos = {
                   x: baseX + offsetX,
@@ -1431,6 +1488,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
         onMouseUp={onMouseUp}
         onNodeClick={onNodeClick}
         onNodeMouseEnter={onNodeMouseEnter}
+        onNodeDragStop={onNodeDragStop}
         panOnDrag={isSpacePressed || tool === 'hand' ? true : (isDrawing && tool !== 'select' ? [1, 2] : true)}
         selectionOnDrag={!isDrawing && !isSpacePressed && tool !== 'hand'}
         panOnScroll={true}
