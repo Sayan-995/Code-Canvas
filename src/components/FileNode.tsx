@@ -1,14 +1,11 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, useNodeId } from 'reactflow';
-import { FileCode, Edit2, Save, X, Play, Sparkles, BookOpen, Code, Loader2, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { FileCode, Edit2, Save, X, Play, Sparkles, BookOpen, Code, Loader2 } from 'lucide-react';
 import { FileAnalysis } from '../utils/codeAnalyzer';
 import { explainCode } from '../services/gemini';
 import { useExplanationStore } from '../store/useExplanationStore';
 import { useFileStore } from '../store/useFileStore';
-import { useAnalysisStore } from '../store/useAnalysisStore';
 import { summarizeFunctions, FunctionSummary } from '../services/functionSummarizer';
-import { analyzeCode } from '../services/staticAnalyzer';
-import { Diagnostic } from '../types/analysis';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-typescript';
@@ -82,83 +79,8 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
   const [functionSummaries, setFunctionSummaries] = useState<FunctionSummary[]>([]);
   const [isLoadingSummaries, setIsLoadingSummaries] = useState(false);
   const [localViewMode, setLocalViewMode] = useState<'full' | 'understanding' | null>(null);
-  const [hoveredDiagnostic, setHoveredDiagnostic] = useState<Diagnostic | null>(null);
-  
   const { openExplanation } = useExplanationStore();
   const { cachedRepoData } = useFileStore();
-  
-  // Subscribe to analysis store for diagnostics (Requirement 1.1, 1.3, 2.3)
-  const { analysisResults, isAnalyzing, analysisConfig, setAnalysisResult, setIsAnalyzing } = useAnalysisStore();
-  
-  // Get diagnostics for this file
-  const fileDiagnostics = useMemo(() => {
-    const result = analysisResults.get(data.path);
-    return result?.diagnostics ?? [];
-  }, [analysisResults, data.path]);
-  
-  // Group diagnostics by line for efficient lookup
-  const diagnosticsByLine = useMemo(() => {
-    const byLine = new Map<number, Diagnostic[]>();
-    fileDiagnostics.forEach(d => {
-      const line = d.sourceRange.startLine;
-      if (!byLine.has(line)) {
-        byLine.set(line, []);
-      }
-      byLine.get(line)!.push(d);
-    });
-    return byLine;
-  }, [fileDiagnostics]);
-  
-  // Count errors and warnings for header display
-  const errorCount = fileDiagnostics.filter(d => d.severity === 'error').length;
-  const warningCount = fileDiagnostics.filter(d => d.severity === 'warning').length;
-  
-  // Debounce timer ref for analysis trigger
-  const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  // Debounced analysis trigger (Requirement 1.1, 2.2, 2.3)
-  const triggerAnalysis = useCallback(async (content: string) => {
-    // Only analyze TypeScript/JavaScript files
-    const isAnalyzableFile = ['typescript', 'javascript', 'tsx', 'jsx'].includes(data.language) ||
-      data.path.endsWith('.ts') || data.path.endsWith('.tsx') ||
-      data.path.endsWith('.js') || data.path.endsWith('.jsx');
-    
-    if (!isAnalyzableFile) return;
-    
-    setIsAnalyzing(true);
-    try {
-      const result = await analyzeCode(
-        data.path, // Use path as segmentId
-        content,
-        analysisConfig,
-        data.path
-      );
-      setAnalysisResult(data.path, result);
-    } catch (error) {
-      console.error('Analysis failed:', error);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [data.path, data.language, analysisConfig, setAnalysisResult, setIsAnalyzing]);
-  
-  // Debounced analysis on content change (300ms debounce for near-instant feedback)
-  useEffect(() => {
-    // Clear any pending analysis
-    if (analysisTimerRef.current) {
-      clearTimeout(analysisTimerRef.current);
-    }
-    
-    // Schedule new analysis with debounce
-    analysisTimerRef.current = setTimeout(() => {
-      triggerAnalysis(data.content);
-    }, 300);
-    
-    return () => {
-      if (analysisTimerRef.current) {
-        clearTimeout(analysisTimerRef.current);
-      }
-    };
-  }, [data.content, triggerAnalysis]);
   
   // Determine effective view mode (local override or global)
   const viewMode = localViewMode ?? cachedRepoData?.viewMode ?? 'full';
@@ -631,27 +553,6 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
               {data.path}
             </span>
             {/* Diagnostic indicators */}
-            {(errorCount > 0 || warningCount > 0 || isAnalyzing) && (
-              <div className="flex items-center gap-1 ml-2">
-                {isAnalyzing && (
-                  <span title="Analyzing...">
-                    <Loader2 size={12} className="animate-spin text-blue-400" />
-                  </span>
-                )}
-                {errorCount > 0 && (
-                  <span className="flex items-center gap-0.5 text-red-400 text-xs" title={`${errorCount} error(s)`}>
-                    <AlertCircle size={12} />
-                    <span>{errorCount}</span>
-                  </span>
-                )}
-                {warningCount > 0 && (
-                  <span className="flex items-center gap-0.5 text-yellow-400 text-xs" title={`${warningCount} warning(s)`}>
-                    <AlertTriangle size={12} />
-                    <span>{warningCount}</span>
-                  </span>
-                )}
-              </div>
-            )}
           </div>
           <div className="flex items-center gap-2">
             {isEditing ? (
@@ -766,12 +667,6 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
                 const isReturnLine = data.activeReturnLines?.includes(lineNumber);
                 const isFlowFunc = isLineInHighlightedFunction(i);
                 
-                // Get diagnostics for this line (Requirement 1.3 - precise source range)
-                const lineDiagnostics = diagnosticsByLine.get(lineNumber) ?? [];
-                const hasError = lineDiagnostics.some(d => d.severity === 'error');
-                const hasWarning = lineDiagnostics.some(d => d.severity === 'warning');
-                const hasInfo = lineDiagnostics.some(d => d.severity === 'info');
-                
                 // Check if this line is part of a highlighted function body
                 const isInHighlightedFunction = data.highlightedFunctions && data.highlightedFunctions.length > 0 && 
                   data.analysis?.functions.some(func => 
@@ -791,86 +686,35 @@ export const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
                   key={i} 
                   id={`line-${data.path}-${lineNumber}`}
                   className={`relative min-h-[1.2em] leading-relaxed pl-2 transition-colors duration-300 group/line ${
-                    hasError
-                      ? 'bg-red-500/15 border-l-2 border-red-500'
-                      : hasWarning
-                        ? 'bg-yellow-500/10 border-l-2 border-yellow-500'
-                        : isInHighlightedFunction
-                          ? 'bg-blue-500/25 border-l-4 border-blue-500'
-                          : isExecuted
-                            ? 'bg-red-500/30 border-l-4 border-red-500 animate-pulse-once'
-                            : isFlowLine 
-                              ? 'bg-cyan-500/20 border-l-2 border-cyan-400' 
-                              : isReturnLine
-                                ? 'bg-purple-500/20 border-l-2 border-purple-400'
-                                : isEndpointLine
-                                  ? 'bg-green-500/10 border-l-2 border-green-500/30'
-                                  : isFlowFunc 
-                                    ? 'bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
-                                    : ''
+                    isExecuted
+                      ? 'bg-red-500/30 border-l-4 border-red-500 animate-pulse-once'
+                      : isFlowLine 
+                        ? 'bg-cyan-500/20 border-l-2 border-cyan-400' 
+                        : isReturnLine
+                          ? 'bg-purple-500/20 border-l-2 border-purple-400'
+                          : isEndpointLine
+                            ? 'bg-green-500/10 border-l-2 border-green-500/30'
+                            : isInHighlightedFunction
+                              ? 'bg-blue-500/25 border-l-4 border-blue-500'
+                              : isFlowFunc 
+                                ? 'bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
+                                : ''
                   }`}
                 >
-                  {/* Diagnostic indicator in gutter */}
-                  {lineDiagnostics.length > 0 && (
-                    <div 
-                      className="absolute left-0 top-0 bottom-0 w-5 flex items-center justify-center cursor-pointer"
-                      onMouseEnter={() => setHoveredDiagnostic(lineDiagnostics[0])}
-                      onMouseLeave={() => setHoveredDiagnostic(null)}
-                    >
-                      {hasError ? (
-                        <AlertCircle size={12} className="text-red-400" />
-                      ) : hasWarning ? (
-                        <AlertTriangle size={12} className="text-yellow-400" />
-                      ) : hasInfo ? (
-                        <Info size={12} className="text-blue-400" />
-                      ) : null}
-                    </div>
-                  )}
                   {/* Line Number */}
                   <span className={`inline-block w-8 select-none text-right mr-4 ${
-                    hasError
-                      ? 'text-red-400'
-                      : hasWarning
-                        ? 'text-yellow-400'
-                        : isExecuted 
-                          ? 'text-red-400 font-bold' 
-                          : isFlowLine 
-                            ? 'text-cyan-400 font-bold' 
-                            : isReturnLine 
-                              ? 'text-purple-400 font-bold' 
-                              : isEndpointLine 
-                                ? 'text-green-400 font-bold' 
-                                : 'text-[#858585]'
+                    isExecuted 
+                      ? 'text-red-400 font-bold' 
+                      : isFlowLine 
+                        ? 'text-cyan-400 font-bold' 
+                        : isReturnLine 
+                          ? 'text-purple-400 font-bold' 
+                          : isEndpointLine 
+                            ? 'text-green-400 font-bold' 
+                            : 'text-[#858585]'
                   }`}>{lineNumber}</span>
                   {/* Code */}
                   {line}
-                  {/* Diagnostic tooltip on hover */}
-                  {lineDiagnostics.length > 0 && hoveredDiagnostic && hoveredDiagnostic.sourceRange.startLine === lineNumber && (
-                    <div className="absolute left-12 top-full z-50 mt-1 max-w-md bg-[#1e1e1e] border border-[#444] rounded shadow-lg p-2 text-xs">
-                      {lineDiagnostics.map((d, idx) => (
-                        <div key={idx} className={`flex items-start gap-2 ${idx > 0 ? 'mt-2 pt-2 border-t border-[#333]' : ''}`}>
-                          {d.severity === 'error' ? (
-                            <AlertCircle size={12} className="text-red-400 mt-0.5 flex-shrink-0" />
-                          ) : d.severity === 'warning' ? (
-                            <AlertTriangle size={12} className="text-yellow-400 mt-0.5 flex-shrink-0" />
-                          ) : (
-                            <Info size={12} className="text-blue-400 mt-0.5 flex-shrink-0" />
-                          )}
-                          <div>
-                            <span className={`${
-                              d.severity === 'error' ? 'text-red-300' : 
-                              d.severity === 'warning' ? 'text-yellow-300' : 'text-blue-300'
-                            }`}>
-                              {d.message}
-                            </span>
-                            {d.ruleId && (
-                              <span className="text-gray-500 ml-2">({d.source}: {d.ruleId})</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                   {/* Handles for this line */}
                   {getHandlesForLine(i)}
                 </div>

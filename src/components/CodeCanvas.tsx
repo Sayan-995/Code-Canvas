@@ -16,12 +16,13 @@ import { FileStructure, useFileStore, Drawing } from '../store/useFileStore';
 import { FileNode } from './FileNode';
 import { FlowEdge } from './FlowEdge';
 import { DrawingNode } from './DrawingNode';
-import { PenTool, MousePointer2, Eraser, Circle, Square, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic, FolderTree, MessageSquare } from 'lucide-react';
+import { PenTool, MousePointer2, Eraser, Circle, Square, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic, FolderTree, Maximize2, ChevronDown, MessageSquare } from 'lucide-react';
 import { useCollaboration } from '../hooks/useCollaboration';
 import { CodeSearchEngine } from '../services/searchEngine';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
 import { FileTreeView } from './FileTreeView';
 import { Chat } from './Chat';
+import { FullscreenTreeView } from './FullscreenTreeView';
 
 const nodeTypes = {
   fileNode: FileNode,
@@ -98,6 +99,17 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
 
   // File Tree View State
   const [isTreeViewOpen, setIsTreeViewOpen] = useState(false);
+  const [isFullscreenTreeOpen, setIsFullscreenTreeOpen] = useState(false);
+  const [isTreeDropdownOpen, setIsTreeDropdownOpen] = useState(false);
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setIsTreeDropdownOpen(false);
+    if (isTreeDropdownOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [isTreeDropdownOpen]);
   
   useEffect(() => {
     const animals = ['Penguin', 'Badger', 'Capybara', 'Dolphin', 'Eagle', 'Fox', 'Giraffe', 'Hedgehog', 'Iguana', 'Jaguar', 'Koala', 'Lemur', 'Meerkat', 'Narwhal', 'Octopus', 'Panda', 'Quokka', 'Rabbit', 'Sloth', 'Tiger', 'Unicorn', 'Vulture', 'Walrus', 'Xerus', 'Yak', 'Zebra'];
@@ -1003,6 +1015,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const onPaneClick = useCallback(() => {
     setSelectedFunction(null);
     setEdges(prev => prev.filter(e => !e.id.startsWith('edge-')));
+    setIsTreeDropdownOpen(false);
   }, [setEdges]);
 
   // Handle file click from tree view - navigate to the file node on canvas
@@ -1186,47 +1199,77 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
           animation: pulse-once 0.3s ease-in-out;
         }
       `}</style>
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
-        <button 
-          onClick={onBack}
-          className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
-        >
-          Back to Upload
-        </button>
-        <button
-          onClick={() => setIsDrawing(!isDrawing)}
-          className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
-            isDrawing 
-              ? 'bg-orange-600 border-orange-500 text-white' 
-              : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
-          }`}
-        >
-          {isDrawing ? <PenTool size={18} /> : <MousePointer2 size={18} />}
-          {isDrawing ? 'Drawing Mode' : 'Selection Mode'}
-        </button>
-        <button
-          onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              alert('Link copied to clipboard!');
-          }}
-          className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors flex items-center gap-2"
-          title="Share Link"
-        >
-          <LinkIcon size={18} />
-          {status === 'connected' ? 'Share' : 'Connecting...'}
-        </button>
-        <button
-          onClick={() => setIsTreeViewOpen(!isTreeViewOpen)}
-          className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
-            isTreeViewOpen 
-              ? 'bg-blue-600 border-blue-500 text-white' 
-              : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
-          }`}
-          title="Toggle File Tree"
-        >
-          <FolderTree size={18} />
-          File Tree
-        </button>
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 items-start">
+        <div className="flex gap-2">
+          <button 
+            onClick={onBack}
+            className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
+          >
+            Back to Upload
+          </button>
+          <button
+            onClick={() => setIsDrawing(!isDrawing)}
+            className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
+              isDrawing 
+                ? 'bg-orange-600 border-orange-500 text-white' 
+                : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+            }`}
+          >
+            {isDrawing ? <PenTool size={18} /> : <MousePointer2 size={18} />}
+            {isDrawing ? 'Drawing' : 'Select'}
+          </button>
+          <button
+            onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert('Link copied to clipboard!');
+            }}
+            className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors flex items-center gap-2"
+            title="Share Link"
+          >
+            <LinkIcon size={18} />
+            Share
+          </button>
+        </div>
+        
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setIsTreeDropdownOpen(!isTreeDropdownOpen)}
+            className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
+              isTreeViewOpen || isFullscreenTreeOpen || isTreeDropdownOpen
+                ? 'bg-blue-600 border-blue-500 text-white' 
+                : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+            }`}
+            title="File Explorer"
+          >
+            <FolderTree size={18} />
+            Explorer
+            <ChevronDown size={14} className={`transition-transform ${isTreeDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {isTreeDropdownOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 min-w-[180px] animate-in fade-in slide-in-from-top-1 duration-150">
+              <button
+                onClick={() => { setIsTreeViewOpen(!isTreeViewOpen); setIsTreeDropdownOpen(false); }}
+                className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-700 transition-colors text-left"
+              >
+                <FolderTree size={16} className="text-blue-400" />
+                <div>
+                  <div className="text-sm text-white">Side Panel</div>
+                  <div className="text-xs text-gray-500">Quick file browser</div>
+                </div>
+              </button>
+              <button
+                onClick={() => { setIsFullscreenTreeOpen(true); setIsTreeDropdownOpen(false); }}
+                className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-700 transition-colors text-left border-t border-gray-700"
+              >
+                <Maximize2 size={16} className="text-purple-400" />
+                <div>
+                  <div className="text-sm text-white">Fullscreen View</div>
+                  <div className="text-xs text-gray-500">Animated tree visualization</div>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Chat Toggle Button - Left Side Vertically Centered */}
@@ -1457,6 +1500,14 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
         onFileClick={handleTreeFileClick}
         isOpen={isTreeViewOpen}
         onClose={() => setIsTreeViewOpen(false)}
+      />
+
+      {/* Fullscreen Tree View */}
+      <FullscreenTreeView
+        files={files}
+        onFileClick={handleTreeFileClick}
+        isOpen={isFullscreenTreeOpen}
+        onClose={() => setIsFullscreenTreeOpen(false)}
       />
 
       {/* Search Input Bar with Tabs */}

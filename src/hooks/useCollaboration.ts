@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import * as Y from 'yjs';
-import { WebrtcProvider } from 'y-webrtc';
+import { WebsocketProvider } from 'y-websocket';
 import { useFileStore, Drawing } from '../store/useFileStore';
 
 export const useCollaboration = (roomId: string | null) => {
@@ -15,18 +15,25 @@ export const useCollaboration = (roomId: string | null) => {
     }
 
     const ydoc = new Y.Doc();
-    // Use local signaling server to avoid public server errors
-    const provider = new WebrtcProvider(roomId, ydoc, {
-        signaling: ['ws://localhost:4444']
-    });
+    // Use y-websocket provider connecting to our backend
+    // Note: You need to run a y-websocket server or compatible endpoint
+    // Since we have a custom socket.io backend, we might need a different approach or a separate y-websocket server.
+    // For now, let's try the public demo server or a local one if you run `npx y-websocket`
+    // If you want to use your existing backend (port 3001), it needs to support y-websocket protocol.
+    // Assuming we want to use the public one for testing or a local one on 1234 (default for y-websocket)
+    // But user asked to remove 4444.
+    
+    // Let's use a public demo for now to fix the error, or we can implement y-websocket on the backend.
+    // Given the constraints, let's try to connect to the backend port 3001 assuming we will add y-websocket support there.
+    const provider = new WebsocketProvider('ws://localhost:3001', roomId, ydoc);
 
     const yDrawings = ydoc.getArray<Drawing>('drawings');
     yArrayRef.current = yDrawings;
 
     setStatus('connecting');
 
-    provider.on('status', ({ connected }: { connected: boolean }) => {
-      setStatus(connected ? 'connected' : 'disconnected');
+    provider.on('status', ({ status }: { status: string }) => {
+      setStatus(status === 'connected' ? 'connected' : 'disconnected');
     });
 
     yDrawings.observe(() => {

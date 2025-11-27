@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Folder, FolderOpen, FileCode, FileText, FileJson, File, X } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, FolderOpen, FileCode, FileText, FileJson, File, X, FolderTree } from 'lucide-react';
 import { FileStructure } from '../store/useFileStore';
 
 interface TreeNode {
@@ -204,35 +204,38 @@ export const FileTreeView: React.FC<FileTreeViewProps> = ({ files, onFileClick, 
   if (!isOpen) return null;
   
   return (
-    <div className="absolute left-4 top-20 z-40 w-72 max-h-[calc(100vh-120px)] bg-gray-900 border border-gray-700 rounded-lg shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left-2 duration-200">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 bg-gray-800">
-        <span className="text-sm font-medium text-gray-200">File Explorer</span>
+    <div className="fixed top-0 left-0 h-full w-[400px] bg-[#1e1e1e] border-r border-[#333] shadow-2xl z-[100] flex flex-col animate-in slide-in-from-left duration-300">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-[#333] bg-[#252526]">
+        <span className="text-base font-semibold text-gray-100 flex items-center gap-2">
+          <FolderTree size={18} className="text-blue-400" />
+          File Explorer
+        </span>
         <div className="flex items-center gap-1">
-          <button onClick={expandAll} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white" title="Expand All">
-            <ChevronDown size={14} />
+          <button onClick={expandAll} className="p-1.5 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors" title="Expand All">
+            <ChevronDown size={16} />
           </button>
-          <button onClick={collapseAll} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white" title="Collapse All">
-            <ChevronRight size={14} />
+          <button onClick={collapseAll} className="p-1.5 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors" title="Collapse All">
+            <ChevronRight size={16} />
           </button>
-          <button onClick={onClose} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white" title="Close">
-            <X size={14} />
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors" title="Close">
+            <X size={18} />
           </button>
         </div>
       </div>
       
-      <div className="px-2 py-2 border-b border-gray-700">
+      <div className="px-3 py-3 border-b border-[#333]">
         <input
           type="text"
           value={searchFilter}
           onChange={(e) => setSearchFilter(e.target.value)}
           placeholder="Filter files..."
-          className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500"
+          className="w-full bg-[#2d2d2d] border border-[#444] rounded-md px-3 py-1.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500 transition-colors"
         />
       </div>
       
-      <div className="flex-1 overflow-y-auto py-1">
-        {filteredTree.length === 0 ? (
-          <div className="text-center text-gray-500 text-sm py-4">No files found</div>
+      <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">
+        {(!filteredTree || filteredTree.length === 0) ? (
+          <div className="text-center text-gray-500 text-sm py-8">No files found</div>
         ) : (
           filteredTree.map(node => (
             <TreeNodeItem
@@ -247,8 +250,9 @@ export const FileTreeView: React.FC<FileTreeViewProps> = ({ files, onFileClick, 
         )}
       </div>
       
-      <div className="px-3 py-2 border-t border-gray-700 bg-gray-800 text-xs text-gray-500">
-        {files.length} files
+      <div className="px-4 py-3 border-t border-[#333] bg-[#252526] text-xs text-gray-500 flex justify-between items-center">
+        <span>{files.length} files</span>
+        <span>Project Root</span>
       </div>
     </div>
   );

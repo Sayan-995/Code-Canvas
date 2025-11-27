@@ -2,16 +2,38 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const fs = require('fs');
+const WebSocket = require('ws');
+const { setupWSConnection } = require('y-websocket/bin/utils');
 
 const app = express();
 app.use(cors());
+app.use(express.json({ limit: '10mb' })); // Enable JSON body parsing with large limit
 
 const server = http.createServer(app);
+
+// Setup Yjs WebSocket server
+const wss = new WebSocket.Server({ noServer: true });
+
+wss.on('connection', (ws, req) => {
+  setupWSConnection(ws, req);
+});
+
+server.on('upgrade', (request, socket, head) => {
+  // Handle Yjs WebSocket connections
+  if (request.url.startsWith('/')) { // You might want to scope this to a specific path like /yjs
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  }
+});
+
 const io = new Server(server, {
   cors: {
     origin: "*", // Allow all origins for now, or specify your frontend URL
     methods: ["GET", "POST"]
-  }
+  },
+  path: '/socket.io'
 });
 
 const PORT = process.env.PORT || 3001;
