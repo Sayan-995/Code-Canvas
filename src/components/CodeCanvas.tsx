@@ -138,7 +138,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
       }
   }, [propRoomId]);
 
-  const { status, addDrawingToYjs, updateDrawingInYjs, removeDrawingFromYjs } = useCollaboration(roomId);
+  const { addDrawingToYjs, updateDrawingInYjs, removeDrawingFromYjs } = useCollaboration(roomId);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

@@ -1,4 +1,4 @@
-const GEMINI_API_KEY = 'AIzaSyA2u56h76HNeokU4g9QjhYv65HoXqtW0ew';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 export interface FileSegment {
@@ -11,69 +11,6 @@ export interface FileSegment {
 export interface SegmentedRepo {
   segments: FileSegment[];
 }
-
-export const categorizeRepository = async (filePaths: string[]): Promise<SegmentedRepo> => {
-  const prompt = `
-You are a code repository analyzer. Given a list of file paths from a repository, categorize them into logical segments.
-
-Return a JSON object with this exact structure (no markdown, just raw JSON):
-{
-  "segments": [
-    {
-      "category": "Category Name",
-      "description": "Brief description of what these files contain",
-      "files": ["path/to/file1", "path/to/file2"],
-      "icon": "emoji"
-    }
-  ]
-}
-
-Use these categories (only include categories that have files):
-- "Core Source Code" (icon: "💻") - Main application logic, components, hooks, services
-- "Configuration" (icon: "⚙️") - Config files like package.json, tsconfig, vite.config, etc.
-- "Styles" (icon: "🎨") - CSS, SCSS, styled-components, Tailwind files
-- "Assets & Media" (icon: "🖼️") - Images, SVGs, fonts, icons, videos
-- "Documentation" (icon: "📚") - README, docs, markdown files, comments
-- "Tests" (icon: "🧪") - Test files, spec files, __tests__ folders
-- "Types & Interfaces" (icon: "📝") - TypeScript type definitions, .d.ts files
-- "Build & Scripts" (icon: "🔧") - Build scripts, CI/CD configs, Dockerfiles
-- "Data & Mocks" (icon: "📦") - JSON data, mock files, fixtures, seeds
-
-File paths to categorize:
-${filePaths.join('\n')}
-`;
-
-  try {
-    const response = await fetch(`${API_URL}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: "application/json"
-        }
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!text) {
-      throw new Error('No response from Gemini');
-    }
-
-    return JSON.parse(text) as SegmentedRepo;
-  } catch (error) {
-    console.error('Repo categorization failed:', error);
-    return fallbackCategorization(filePaths);
-  }
-};
-
 
 // Fallback categorization when AI fails
 const fallbackCategorization = (filePaths: string[]): SegmentedRepo => {
@@ -124,4 +61,71 @@ const fallbackCategorization = (filePaths: string[]): SegmentedRepo => {
   return {
     segments: Object.values(segments).filter(s => s.files.length > 0)
   };
+};
+
+export const categorizeRepository = async (filePaths: string[]): Promise<SegmentedRepo> => {
+  const prompt = `
+You are a code repository analyzer. Given a list of file paths from a repository, categorize them into logical segments.
+
+Return a JSON object with this exact structure (no markdown, just raw JSON):
+{
+  "segments": [
+    {
+      "category": "Category Name",
+      "description": "Brief description of what these files contain",
+      "files": ["path/to/file1", "path/to/file2"],
+      "icon": "emoji"
+    }
+  ]
+}
+
+Use these categories (only include categories that have files):
+- "Core Source Code" (icon: "💻") - Main application logic, components, hooks, services
+- "Configuration" (icon: "⚙️") - Config files like package.json, tsconfig, vite.config, etc.
+- "Styles" (icon: "🎨") - CSS, SCSS, styled-components, Tailwind files
+- "Assets & Media" (icon: "🖼️") - Images, SVGs, fonts, icons, videos
+- "Documentation" (icon: "📚") - README, docs, markdown files, comments
+- "Tests" (icon: "🧪") - Test files, spec files, __tests__ folders
+- "Types & Interfaces" (icon: "📝") - TypeScript type definitions, .d.ts files
+- "Build & Scripts" (icon: "🔧") - Build scripts, CI/CD configs, Dockerfiles
+- "Data & Mocks" (icon: "📦") - JSON data, mock files, fixtures, seeds
+
+File paths:
+${filePaths.join('\n')}
+`;
+
+  try {
+    if (!GEMINI_API_KEY) {
+      console.warn('Missing Gemini API Key, falling back to local logic');
+      return fallbackCategorization(filePaths);
+    }
+
+    const response = await fetch(`${API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!text) {
+      throw new Error('No response from Gemini');
+    }
+
+    return JSON.parse(text) as SegmentedRepo;
+  } catch (error) {
+    console.error('Repo categorization failed:', error);
+    return fallbackCategorization(filePaths);
+  }
 };
