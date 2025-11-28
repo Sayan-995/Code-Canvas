@@ -36,51 +36,101 @@ export class CodeSearchEngine {
     };
 
     files.forEach(file => {
-      // Extract keywords from filename
-      const fileKeywords = this.extractKeywordsFromFilename(file.path, file.name);
-      this.index.files.set(file.path, fileKeywords);
+      this.addFileToIndex(file);
+    });
+  }
 
-      // Index file by its keywords
-      fileKeywords.forEach(keyword => {
-        this.addToKeywordIndex(keyword, 'file', {
-          path: file.path,
-          name: file.name,
-          score: 10, // Filename match
-        });
+  // Add a single file to the index (for incremental updates)
+  addFileToIndex(file: FileStructure) {
+    // Extract keywords from filename
+    const fileKeywords = this.extractKeywordsFromFilename(file.path, file.name);
+    this.index.files.set(file.path, fileKeywords);
+
+    // Index file by its keywords
+    fileKeywords.forEach(keyword => {
+      this.addToKeywordIndex(keyword, 'file', {
+        path: file.path,
+        name: file.name,
+        score: 10, // Filename match
       });
+    });
 
-      // Extract and index functions
-      if (file.analysis?.functions) {
-        file.analysis.functions.forEach(func => {
-          const funcKeywords = this.extractKeywordsFromFunctionName(func.name);
-          
-          // Store function location
-          this.index.functions.set(func.name, {
+    // Extract and index functions
+    if (file.analysis?.functions) {
+      file.analysis.functions.forEach(func => {
+        const funcKeywords = this.extractKeywordsFromFunctionName(func.name);
+        
+        // Store function location
+        this.index.functions.set(func.name, {
+          file: file.path,
+          line: func.startLine,
+        });
+
+        // Index function by its keywords
+        funcKeywords.forEach(keyword => {
+          this.addToKeywordIndex(keyword, 'function', {
+            name: func.name,
             file: file.path,
             line: func.startLine,
-          });
-
-          // Index function by its keywords
-          funcKeywords.forEach(keyword => {
-            this.addToKeywordIndex(keyword, 'function', {
-              name: func.name,
-              file: file.path,
-              line: func.startLine,
-              score: 10, // Function name match
-            });
-          });
-
-          // Also add file to this keyword (file contains this function)
-          funcKeywords.forEach(keyword => {
-            this.addToKeywordIndex(keyword, 'file', {
-              path: file.path,
-              name: file.name,
-              score: 5, // Contains function with this keyword
-            });
+            score: 10, // Function name match
           });
         });
+
+        // Also add file to this keyword (file contains this function)
+        funcKeywords.forEach(keyword => {
+          this.addToKeywordIndex(keyword, 'file', {
+            path: file.path,
+            name: file.name,
+            score: 5, // Contains function with this keyword
+          });
+        });
+      });
+    }
+  }
+
+  // Remove a file from the index (for incremental updates)
+  removeFileFromIndex(filePath: string) {
+    // Get keywords for this file
+    const fileKeywords = this.index.files.get(filePath);
+    
+    if (fileKeywords) {
+      // Remove file from keyword index
+      fileKeywords.forEach(keyword => {
+        const entry = this.index.keywords.get(keyword);
+        if (entry) {
+          entry.files = entry.files.filter(f => f.path !== filePath);
+          // Clean up empty keyword entries
+          if (entry.files.length === 0 && entry.functions.length === 0) {
+            this.index.keywords.delete(keyword);
+          }
+        }
+      });
+    }
+
+    // Remove functions from this file
+    const functionsToRemove: string[] = [];
+    this.index.functions.forEach((location, funcName) => {
+      if (location.file === filePath) {
+        functionsToRemove.push(funcName);
       }
     });
+
+    functionsToRemove.forEach(funcName => {
+      this.index.functions.delete(funcName);
+      // Also remove from keyword index
+      this.index.keywords.forEach(entry => {
+        entry.functions = entry.functions.filter(f => f.name !== funcName || f.file !== filePath);
+      });
+    });
+
+    // Remove file entry
+    this.index.files.delete(filePath);
+  }
+
+  // Update a file in the index (for incremental updates)
+  updateFileInIndex(file: FileStructure) {
+    this.removeFileFromIndex(file.path);
+    this.addFileToIndex(file);
   }
 
   // Common abbreviations mapping

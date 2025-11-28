@@ -1093,11 +1093,53 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
     }
   }, [setCenter]);
 
-  useEffect(() => {
-    if (files.length === 0) return;
+  // Track previous files for incremental index updates
+  const prevFilesRef = useRef<FileStructure[]>([]);
 
-    // Build search index when files change
-    searchEngineRef.current.buildIndex(files);
+  useEffect(() => {
+    if (files.length === 0) {
+      prevFilesRef.current = [];
+      return;
+    }
+
+    // Incremental search index updates
+    const prevFiles = prevFilesRef.current;
+    const prevFilePaths = new Set(prevFiles.map(f => f.path));
+    const currentFilePaths = new Set(files.map(f => f.path));
+
+    // Detect new files (added)
+    const addedFiles = files.filter(f => !prevFilePaths.has(f.path));
+    addedFiles.forEach(file => {
+      searchEngineRef.current.addFileToIndex(file);
+    });
+
+    // Detect removed files (deleted)
+    const removedFilePaths = prevFiles
+      .filter(f => !currentFilePaths.has(f.path))
+      .map(f => f.path);
+    removedFilePaths.forEach(path => {
+      searchEngineRef.current.removeFileFromIndex(path);
+    });
+
+    // Detect updated files (content or analysis changed)
+    const updatedFiles = files.filter(file => {
+      const prevFile = prevFiles.find(f => f.path === file.path);
+      return prevFile && (
+        prevFile.content !== file.content || 
+        prevFile.analysis !== file.analysis
+      );
+    });
+    updatedFiles.forEach(file => {
+      searchEngineRef.current.updateFileInIndex(file);
+    });
+
+    // If this is the first load (no previous files), build entire index
+    if (prevFiles.length === 0) {
+      searchEngineRef.current.buildIndex(files);
+    }
+
+    // Update the ref for next comparison
+    prevFilesRef.current = files;
 
     setNodes((prevNodes) => {
       const existingFileNodes = prevNodes.filter(n => n.type === 'fileNode');
