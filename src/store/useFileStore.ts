@@ -57,6 +57,7 @@ interface FileStore {
   cachedRepoData: CachedRepoData | null;
   setFiles: (files: FileStructure[]) => void;
   addFile: (file: FileStructure) => void;
+  removeFile: (path: string) => void;
   updateFileContent: (path: string, newContent: string) => void;
   setGitHubContext: (context: GitHubContext | null) => void;
   clearFiles: () => void;
@@ -79,6 +80,9 @@ export const useFileStore = create<FileStore>((set) => ({
   cachedRepoData: null,
   setFiles: (files) => set({ files }),
   addFile: (file) => set((state) => ({ files: [...state.files, file] })),
+  removeFile: (path) => set((state) => ({
+    files: state.files.filter(f => f.path !== path)
+  })),
   updateFileContent: (path, newContent) => set((state) => {
     const updatedFiles = state.files.map(f => {
       if (f.path === path) {

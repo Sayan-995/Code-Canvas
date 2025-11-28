@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Index New Files for Search",
+  "description": "Automatically adds newly created or imported files to the search index for instant navigation",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "src/**/*.js",
+      "src/**/*.jsx"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A new file has been created. Update the search index by calling searchEngineRef.current.addFileToIndex(file) with the new file data. Ensure the file is analyzed first using analyzeCode() to extract functions, then add it to the index. This enables immediate searchability without rebuilding the entire index."
+  }
+}
