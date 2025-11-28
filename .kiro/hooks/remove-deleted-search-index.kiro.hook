@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Remove Deleted Files from Search Index",
+  "description": "Automatically removes deleted files from the search index to keep navigation accurate",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "src/**/*.js",
+      "src/**/*.jsx"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A file has been deleted. Update the search index by calling searchEngineRef.current.removeFileFromIndex(filePath) with the deleted file's path. This removes the file and all its functions from the search index, ensuring search results remain accurate."
+  }
+}
