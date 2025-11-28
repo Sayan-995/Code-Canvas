@@ -5,7 +5,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const fs = require('fs');
 const WebSocket = require('ws');
-const { setupWSConnection } = require('y-websocket/bin/utils.js');
+const { setupWSConnection } = require('./y-utils');
 
 const app = express();
 app.use(cors());
