@@ -298,7 +298,7 @@ export const UploadScreen: React.FC = () => {
 
   return (
     <div 
-      className="relative flex flex-col items-center justify-center h-screen bg-black text-white p-4 overflow-hidden"
+      className="relative flex flex-col items-center justify-center h-screen bg-black text-white p-4 overflow-auto"
       onMouseMove={handleMouseMove}
     >
       {/* Glowing Cursor Effect */}

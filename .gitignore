@@ -35,3 +35,4 @@ coverage
 # Vite
 *.tsbuildinfo
 .vercel
+docs/
