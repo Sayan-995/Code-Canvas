@@ -1302,38 +1302,40 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
         <div className="flex gap-2">
           <button 
             onClick={onBack}
-            className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors"
+            className="bg-gray-800 text-white px-3 md:px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors flex items-center gap-2"
           >
-            Back to Upload
+            <ChevronLeft size={18} className="md:hidden" />
+            <span className="hidden md:inline">Back to Upload</span>
+            <span className="md:hidden">Back</span>
           </button>
           <button
             onClick={() => setIsDrawing(!isDrawing)}
-            className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
+            className={`px-3 md:px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
               isDrawing 
                 ? 'bg-orange-600 border-orange-500 text-white' 
                 : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
             }`}
           >
             {isDrawing ? <PenTool size={18} /> : <MousePointer2 size={18} />}
-            {isDrawing ? 'Drawing' : 'Select'}
+            <span className="hidden md:inline">{isDrawing ? 'Drawing' : 'Select'}</span>
           </button>
           <button
             onClick={() => {
                 navigator.clipboard.writeText(window.location.href);
                 alert('Link copied to clipboard!');
             }}
-            className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors flex items-center gap-2"
+            className="bg-gray-800 text-white px-3 md:px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors flex items-center gap-2"
             title="Share Link"
           >
             <LinkIcon size={18} />
-            Share
+            <span className="hidden md:inline">Share</span>
           </button>
         </div>
         
         <div className="relative" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setIsTreeDropdownOpen(!isTreeDropdownOpen)}
-            className={`px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
+            className={`px-3 md:px-4 py-2 rounded-lg border transition-colors flex items-center gap-2 ${
               isTreeViewOpen || isFullscreenTreeOpen || isTreeDropdownOpen
                 ? 'bg-blue-600 border-blue-500 text-white' 
                 : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
@@ -1341,7 +1343,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
             title="File Explorer"
           >
             <FolderTree size={18} />
-            Explorer
+            <span className="hidden md:inline">Explorer</span>
             <ChevronDown size={14} className={`transition-transform ${isTreeDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isTreeDropdownOpen && (
@@ -1395,10 +1397,8 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
 
       {isPlayingFlow && (
         <div 
-          className="absolute z-50 bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center gap-3 shadow-xl"
+          className="absolute z-50 bg-gray-800 border border-gray-700 rounded-lg p-3 flex flex-col md:flex-row items-center gap-3 shadow-xl right-4 top-20 md:top-5"
           style={{ 
-            right: '20px', 
-            top: '20px',
             userSelect: 'none'
           }}
         >
@@ -1423,7 +1423,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
       )}
 
       {isDrawing && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-gray-800 border border-gray-700 rounded-lg p-1 flex items-center gap-2 shadow-xl">
+        <div className="absolute top-16 md:top-4 left-1/2 -translate-x-1/2 z-10 bg-gray-800 border border-gray-700 rounded-lg p-1 flex flex-wrap justify-center md:flex-nowrap items-center gap-2 shadow-xl max-w-[95vw]">
             <div className="flex items-center gap-1 border-r border-gray-700 pr-2">
                 <button 
                     onClick={() => setTool('hand')}
@@ -1638,8 +1638,8 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
 
         {/* Content based on mode */}
         {inputMode === 'text' ? (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl flex items-center gap-2 p-2" style={{ width: '600px' }}>
-            <Search size={20} className="text-gray-400 ml-2" />
+          <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl flex items-center gap-2 p-2 w-[90vw] max-w-[600px]">
+            <Search size={20} className="text-gray-400 ml-2 flex-shrink-0" />
             <input
               type="text"
               value={searchQuery}
@@ -1696,7 +1696,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
           </div>
         ) : (
           /* Voice Mode - Compact with background box */
-          <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl flex items-center gap-2 p-2" style={{ width: '600px' }}>
+          <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl flex items-center gap-2 p-2 w-[90vw] max-w-[600px]">
             {!isSupported ? (
               <div className="flex-1 text-center">
                 <p className="text-red-400 text-xs">Voice not supported in this browser</p>

@@ -204,7 +204,7 @@ export const FileTreeView: React.FC<FileTreeViewProps> = ({ files, onFileClick, 
   if (!isOpen) return null;
   
   return (
-    <div className="fixed top-0 left-0 h-full w-[400px] bg-[#1e1e1e] border-r border-[#333] shadow-2xl z-[100] flex flex-col animate-in slide-in-from-left duration-300">
+    <div className="fixed top-0 left-0 h-full w-full md:w-[400px] bg-[#1e1e1e] border-r border-[#333] shadow-2xl z-[100] flex flex-col animate-in slide-in-from-left duration-300">
       <div className="flex items-center justify-between px-4 py-4 border-b border-[#333] bg-[#252526]">
         <span className="text-base font-semibold text-gray-100 flex items-center gap-2">
           <FolderTree size={18} className="text-blue-400" />

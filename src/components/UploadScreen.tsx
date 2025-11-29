@@ -323,13 +323,13 @@ export const UploadScreen: React.FC = () => {
 
       {/* Content overlay */}
       <div className={`relative z-10 flex flex-col items-center w-full transition-opacity duration-700 ${transitionStage === 'fading' || transitionStage === 'complete' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-        <h1 className={`text-5xl font-bold mb-12 transition-all duration-500 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600 ${loading ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
+        <h1 className={`text-3xl md:text-5xl font-bold mb-8 md:mb-12 transition-all duration-500 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600 ${loading ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
           Code Canvas
         </h1>
         
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl transition-all duration-500 ${loading ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 w-full max-w-4xl transition-all duration-500 ${loading ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
         {/* Local Upload */}
-        <div className="group bg-gray-900/50 backdrop-blur-sm p-8 rounded-xl border border-gray-800 hover:border-blue-500/50 transition-all duration-300 flex flex-col items-center gap-4 hover:shadow-[0_0_30px_rgba(59,130,246,0.2)]">
+        <div className="group bg-gray-900/50 backdrop-blur-sm p-6 md:p-8 rounded-xl border border-gray-800 hover:border-blue-500/50 transition-all duration-300 flex flex-col items-center gap-4 hover:shadow-[0_0_30px_rgba(59,130,246,0.2)]">
           <div className="p-4 rounded-full bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
             <FolderUp size={48} className="text-blue-400" />
           </div>
@@ -350,7 +350,7 @@ export const UploadScreen: React.FC = () => {
         </div>
 
         {/* GitHub Import */}
-        <div className="group bg-gray-900/50 backdrop-blur-sm p-8 rounded-xl border border-gray-800 hover:border-purple-500/50 transition-all duration-300 flex flex-col items-center gap-4 hover:shadow-[0_0_30px_rgba(168,85,247,0.2)]">
+        <div className="group bg-gray-900/50 backdrop-blur-sm p-6 md:p-8 rounded-xl border border-gray-800 hover:border-purple-500/50 transition-all duration-300 flex flex-col items-center gap-4 hover:shadow-[0_0_30px_rgba(168,85,247,0.2)]">
           <div className="p-4 rounded-full bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
             <Github size={48} className="text-purple-400" />
           </div>

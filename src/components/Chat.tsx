@@ -22,7 +22,12 @@ export const Chat: React.FC<ChatProps> = ({ roomId, username = 'User', onClose }
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Dragging state
-  const [position, setPosition] = useState({ x: window.innerWidth - 340, y: window.innerHeight - 450 });
+  const [position, setPosition] = useState(() => {
+    const width = Math.min(320, window.innerWidth - 20);
+    const x = Math.max(10, window.innerWidth - width - 20);
+    const y = Math.max(10, window.innerHeight - 450);
+    return { x, y };
+  });
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef({ x: 0, y: 0 });
 
@@ -94,7 +99,7 @@ export const Chat: React.FC<ChatProps> = ({ roomId, username = 'User', onClose }
 
   return (
     <div 
-      className="fixed w-80 h-96 bg-gray-800 border border-gray-700 rounded-lg shadow-xl flex flex-col z-50"
+      className="fixed w-[90vw] max-w-80 h-[50vh] max-h-96 bg-gray-800 border border-gray-700 rounded-lg shadow-xl flex flex-col z-50"
       style={{ left: position.x, top: position.y }}
     >
       <div 
