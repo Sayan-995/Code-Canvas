@@ -13,10 +13,11 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { FileStructure, useFileStore, Drawing } from '../store/useFileStore';
+import { GitVisualizer } from './GitVisualizer/GitVisualizer';
 import { FileNode } from './FileNode';
 import { FlowEdge } from './FlowEdge';
 import { DrawingNode } from './DrawingNode';
-import { PenTool, MousePointer2, Eraser, Circle, Square, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic, FolderTree, Maximize2, ChevronDown, MessageSquare } from 'lucide-react';
+import { PenTool, MousePointer2, Eraser, Circle, Square, Minus, Type, Hand, Link as LinkIcon, Search, X, ChevronLeft, ChevronRight, Mic, FolderTree, Maximize2, ChevronDown, MessageSquare, GitBranch } from 'lucide-react';
 import { useCollaboration } from '../hooks/useCollaboration';
 import { CodeSearchEngine } from '../services/searchEngine';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
@@ -58,7 +59,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
-  const { drawings, addDrawing, setDrawings } = useFileStore();
+  const { drawings, addDrawing, setDrawings, githubContext } = useFileStore();
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState<{x:number, y:number}[]>([]);
   const { screenToFlowPosition, setCenter } = useReactFlow();
@@ -68,6 +69,7 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const [currentColor, setCurrentColor] = useState('#ef4444');
   const [currentWidth, setCurrentWidth] = useState(4);
   const [tool, setTool] = useState<'select' | 'hand' | 'pen' | 'eraser' | 'rectangle' | 'circle' | 'line' | 'text'>('pen');
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   
   // Flow Tracking State
   const [flowPath, setFlowPath] = useState<FlowStep[]>([]);
@@ -102,6 +104,9 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
   const [isTreeViewOpen, setIsTreeViewOpen] = useState(false);
   const [isFullscreenTreeOpen, setIsFullscreenTreeOpen] = useState(false);
   const [isTreeDropdownOpen, setIsTreeDropdownOpen] = useState(false);
+  
+  // Git Visualizer State
+  const [isGitVisualizerOpen, setIsGitVisualizerOpen] = useState(false);
   
   // Overlap resolution state
   const overlapResolvedRef = useRef(false);
@@ -1330,6 +1335,16 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
             <LinkIcon size={18} />
             <span className="hidden md:inline">Share</span>
           </button>
+          {githubContext && (
+            <button
+              onClick={() => setIsGitVisualizerOpen(true)}
+              className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors flex items-center gap-2 hover:border-purple-500/50"
+              title="Git History Visualizer"
+            >
+              <GitBranch size={18} className="text-purple-400" />
+              Git Visualiser
+            </button>
+          )}
         </div>
         
         <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -1423,8 +1438,9 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
       )}
 
       {isDrawing && (
-        <div className="absolute top-16 md:top-4 left-1/2 -translate-x-1/2 z-10 bg-gray-800 border border-gray-700 rounded-lg p-1 flex flex-wrap justify-center md:flex-nowrap items-center gap-2 shadow-xl max-w-[95vw]">
-            <div className="flex items-center gap-1 border-r border-gray-700 pr-2">
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-gray-800 border border-gray-700 rounded-lg p-1.5 flex flex-col gap-2 shadow-xl max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+            {/* Drawing Tools - Vertical */}
+            <div className="flex flex-col gap-0.5 border-b border-gray-700 pb-1.5">
                 <button 
                     onClick={() => setTool('hand')}
                     className={`p-1.5 rounded hover:bg-gray-700 ${tool === 'hand' ? 'bg-gray-700 text-blue-400' : 'text-gray-400'}`}
@@ -1483,32 +1499,59 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
                 </button>
             </div>
 
-            <div className="flex items-center gap-1 border-r border-gray-700 pr-2">
-                {['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#a855f7', '#ffffff', '#000000'].map(color => (
-                    <button
-                        key={color}
-                        onClick={() => setCurrentColor(color)}
-                        className={`w-5 h-5 rounded-full border-2 ${currentColor === color ? 'border-white scale-110' : 'border-transparent hover:scale-110'} transition-transform`}
-                        style={{ backgroundColor: color }}
+            {/* Color Picker - Collapsible */}
+            <div className="border-b border-gray-700 pb-1.5">
+                <button
+                    onClick={() => setIsColorPickerOpen(!isColorPickerOpen)}
+                    className="w-full flex items-center justify-center p-1.5 rounded hover:bg-gray-700 text-gray-400"
+                    title="Color Picker"
+                >
+                    <div 
+                        className="w-6 h-6 rounded-full border-2 border-gray-600"
+                        style={{ backgroundColor: currentColor }}
                     />
-                ))}
+                    <ChevronDown 
+                        size={12} 
+                        className={`absolute right-1 transition-transform ${isColorPickerOpen ? 'rotate-180' : ''}`}
+                    />
+                </button>
+                {isColorPickerOpen && (
+                    <div className="flex flex-col gap-0.5 mt-1.5">
+                        {['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#a855f7', '#ffffff', '#000000'].map(color => (
+                            <button
+                                key={color}
+                                onClick={() => setCurrentColor(color)}
+                                className={`w-6 h-6 rounded-full border-2 ${currentColor === color ? 'border-white scale-110' : 'border-transparent hover:scale-110'} transition-transform`}
+                                style={{ backgroundColor: color }}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Stroke Width - Vertical */}
+            <div className="flex flex-col items-center gap-1.5">
                 <input 
                     type="range" 
                     min="1" 
                     max="20" 
                     value={currentWidth} 
                     onChange={(e) => setCurrentWidth(parseInt(e.target.value))}
-                    className="w-16 accent-blue-500"
+                    className="accent-blue-500"
+                    style={{ 
+                      WebkitAppearance: 'slider-vertical',
+                      width: '8px',
+                      height: '60px',
+                      writingMode: 'vertical-lr' as any,
+                      direction: 'rtl'
+                    }}
                 />
                 <div 
-                    className="w-6 h-6 flex items-center justify-center bg-gray-900 rounded"
+                    className="w-7 h-7 flex items-center justify-center bg-gray-900 rounded"
                 >
                     <div 
                         className="rounded-full bg-white"
-                        style={{ width: Math.min(currentWidth, 20), height: Math.min(currentWidth, 20), backgroundColor: currentColor }}
+                        style={{ width: Math.min(currentWidth, 18), height: Math.min(currentWidth, 18), backgroundColor: currentColor }}
                     />
                 </div>
             </div>
@@ -1773,6 +1816,18 @@ const CodeCanvasContent: React.FC<CodeCanvasProps> = ({ files, onBack, onFileUpd
           </div>
         )}
       </div>
+
+      {/* Git Visualizer Overlay */}
+      {isGitVisualizerOpen && githubContext && (
+        <div className="absolute inset-0 z-[100]">
+          <GitVisualizer
+            owner={githubContext.owner}
+            repo={githubContext.repo}
+            token={githubContext.token}
+            onBack={() => setIsGitVisualizerOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
 };
