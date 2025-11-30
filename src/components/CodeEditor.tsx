@@ -8,7 +8,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { Download, Github, Loader2, GitPullRequest } from 'lucide-react';
 import { Octokit } from '@octokit/rest';
-import { io } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client';
 
 import { ExplanationPanel } from './ExplanationPanel';
 
@@ -18,8 +18,19 @@ interface Conflict {
   remote: string;
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
-const socket = io(BACKEND_URL);
+const getSocket = () => {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  return io(backendUrl);
+};
+
+let socketInstance: Socket | null = null;
+
+const getSocketInstance = (): Socket => {
+  if (!socketInstance) {
+    socketInstance = getSocket();
+  }
+  return socketInstance;
+};
 
 export function CodeEditor() {
   const { files, setFiles, updateFileContent, githubContext, markAllAsSynced, setGitHubContext, clearFiles } = useFileStore();
@@ -32,6 +43,7 @@ export function CodeEditor() {
   const [isJoining, setIsJoining] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
   const isRemoteUpdate = useRef(false);
+  const socket = getSocketInstance();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -42,7 +54,7 @@ export function CodeEditor() {
       setIsJoining(true);
       socket.emit('join_room', urlRoomId);
 
-      socket.on('sync_files', (syncedFiles) => {
+      socket.on('sync_files', (syncedFiles: any) => {
         console.log('Received synced files:', syncedFiles);
         isRemoteUpdate.current = true;
         setFiles(syncedFiles);
@@ -53,7 +65,7 @@ export function CodeEditor() {
     return () => {
       socket.off('sync_files');
     };
-  }, []);
+  }, [socket]);
 
   useEffect(() => {
     if (files.length > 0 && !isJoining) {

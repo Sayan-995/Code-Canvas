@@ -14,12 +14,24 @@ interface ChatProps {
   onClose: () => void;
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
-const socket: Socket = io(BACKEND_URL);
+const getSocket = () => {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  return io(backendUrl);
+};
+
+let socketInstance: Socket | null = null;
+
+const getSocketInstance = () => {
+  if (!socketInstance) {
+    socketInstance = getSocket();
+  }
+  return socketInstance;
+};
 
 export const Chat: React.FC<ChatProps> = ({ roomId, username = 'User', onClose }) => {
   const [currentMessage, setCurrentMessage] = useState('');
   const [messageList, setMessageList] = useState<Message[]>([]);
+  const socket = getSocketInstance();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Dragging state
