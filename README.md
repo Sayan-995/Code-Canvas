@@ -1,49 +1,111 @@
 # Code Canvas
 
-A React + TypeScript application that visualizes your code files as floating nodes on an infinite canvas.
+**Code Canvas** is an interactive, visual development environment that transforms your codebase into an infinite, spatial map. Instead of navigating files in a linear list, explore your project as a living graph where logic flows visibly.
 
-## Features
+Built for developers who think visually, Code Canvas combines real-time collaboration, AI-powered organization, and AST-based analysis to help you understand complex systems faster.
 
-- **Upload Folder**: Select a local folder to visualize its structure.
-- **GitHub Import**: Import a public GitHub repository.
-- **Infinite Canvas**: Navigate through your files using an infinite canvas (powered by React Flow).
-- **File Preview**: View the content of your files directly on the canvas.
+![Code Canvas Demo](https://via.placeholder.com/800x400?text=Code+Canvas+Preview) *(Replace with actual screenshot)*
 
-## Getting Started
+## 🚀 Features
 
-1.  Install frontend dependencies:
+### 🧠 Visual Code Understanding
+- **Infinite Canvas**: Navigate your entire codebase on a zoomable, pannable 2D plane (powered by React Flow).
+- **AST Analysis**: Automatically detects dependencies and draws connection lines between files that import/export from each other.
+- **Flow Visualization**: Watch code execution paths come alive with animated "flow particles" that trace logic from function to function.
+
+### 🤝 Real-Time Collaboration
+- **Multiplayer Mode**: Invite teammates to your session via a simple link.
+- **Live Cursors & Selection**: See where others are looking and what they are editing in real-time.
+- **Shared Drawing Board**: Annotate code, draw architectural diagrams, or sketch ideas directly on the canvas.
+- **Integrated Chat**: Discuss code context without leaving the visual environment.
+
+### 🤖 AI-Powered Organization
+- **Smart Categorization**: Uses Gemini AI to automatically group files into logical clusters (e.g., "Services", "Components", "Utils") based on their content, not just folder structure.
+- **Semantic Understanding**: Helps untangle "spaghetti code" by visually separating concerns.
+
+### 🗣️ Voice & Accessibility
+- **Voice Commands**: Navigate, search, and control the canvas using natural voice commands (e.g., "Go to Auth Service", "Zoom in").
+- **Mobile Optimized**: Fully responsive design that works on tablets and phones for code review on the go.
+
+### 🛠️ Developer Tools
+- **GitHub Import**: Instantly visualize any public GitHub repository.
+- **Local Upload**: Drag and drop local folders to map out private projects.
+- **Linting Integration**: See linting errors and warnings directly on the visual nodes.
+- **Monaco Editor**: Full-featured code editing experience inside every node.
+
+## 🏗️ Tech Stack
+
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS
+- **Visualization**: React Flow, D3.js (for layout algorithms)
+- **State Management**: Zustand
+- **Collaboration**: Yjs, WebSockets, Socket.io
+- **Backend**: Node.js, Express
+- **AI**: Google Gemini API
+- **Parsing**: Babel Parser (AST generation)
+
+## 🏁 Getting Started
+
+### Prerequisites
+- Node.js (v18+)
+- npm or yarn
+
+### Installation
+
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/yourusername/code-canvas.git
+    cd code-canvas
+    ```
+
+2.  **Install Frontend Dependencies**
     ```bash
     npm install
     ```
 
-2.  Install backend dependencies:
+3.  **Install Backend Dependencies**
     ```bash
     cd backend
     npm install
     cd ..
     ```
 
-3.  Start the backend server (in a separate terminal):
+4.  **Environment Setup**
+    - Create a `.env` file in the root directory:
+      ```env
+      VITE_BACKEND_URL=http://localhost:3001
+      VITE_GEMINI_API_KEY=your_gemini_api_key_here
+      ```
+    - Create a `.env` file in the `backend` directory:
+      ```env
+      PORT=3001
+      ```
+
+### Running the App
+
+1.  **Start the Backend** (Terminal 1)
     ```bash
     cd backend
-    npm run dev
+    npm start
     ```
 
-4.  Start the frontend development server (in a new terminal):
+2.  **Start the Frontend** (Terminal 2)
     ```bash
     npm run dev
     ```
 
-5.  Open your browser at `http://localhost:5173`.
+3.  Open `http://localhost:5173` in your browser.
 
-## Technologies
+## 🌍 Deployment
 
-- React
-- TypeScript
-- Vite
-- React Flow
-- Tailwind CSS
-- Zustand
-- Octokit
-- Node.js & Express (Backend)
-- Socket.io (Real-time Chat)
+- **Frontend**: Deployed on [Vercel](https://vercel.com).
+- **Backend**: Deployed on [Railway](https://railway.app) (or Render) for WebSocket support.
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+## 👥 Authors
+
+- **Sayan Dutta**
+- **Afham Shakeel**
+- **Samiran Chakraborty**
