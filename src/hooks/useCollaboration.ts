@@ -3,8 +3,18 @@ import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { useFileStore, Drawing } from '../store/useFileStore';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
-const WS_URL = BACKEND_URL.replace('http://', 'ws://').replace('https://', 'wss://');
+const getBackendUrl = () => import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
+// Convert HTTP/HTTPS to WS/WSS for WebSocket connections
+const getWSURL = () => {
+  const backendUrl = getBackendUrl();
+  if (backendUrl.startsWith('https://')) {
+    return backendUrl.replace('https://', 'wss://');
+  } else if (backendUrl.startsWith('http://')) {
+    return backendUrl.replace('http://', 'ws://');
+  }
+  return backendUrl;
+};
 
 export const useCollaboration = (roomId: string | null) => {
   const { setDrawings } = useFileStore();
@@ -17,8 +27,10 @@ export const useCollaboration = (roomId: string | null) => {
         return;
     }
 
+    const wsUrl = getWSURL();
+    console.log('Connecting to Yjs WebSocket:', wsUrl);
     const ydoc = new Y.Doc();
-    const provider = new WebsocketProvider(WS_URL, roomId, ydoc);
+    const provider = new WebsocketProvider(wsUrl, roomId, ydoc);
 
     const yDrawings = ydoc.getArray<Drawing>('drawings');
     yArrayRef.current = yDrawings;

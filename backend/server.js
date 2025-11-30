@@ -12,7 +12,9 @@ const WebSocket = require('ws');
 const { setupWSConnection } = require('./y-utils');
 
 const app = express();
-app.use(cors());
+
+// Allow ALL origins
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' })); // Enable JSON body parsing with large limit
 
 const server = http.createServer(app);
@@ -33,12 +35,15 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://kiro-two.vercel.app';
+
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allow all origins for now, or specify your frontend URL
+    origin: "*",
     methods: ["GET", "POST"]
   },
-  path: '/socket.io'
+  path: '/socket.io',
+  transports: ['websocket', 'polling']
 });
 
 const PORT = process.env.PORT || 3001;
@@ -46,11 +51,11 @@ const PORT = process.env.PORT || 3001;
 const roomData = new Map(); // roomId -> { files: [] }
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('User connected:', socket.id, 'from:', socket.handshake.headers.origin);
 
   socket.on('join_room', (roomId) => {
     socket.join(roomId);
-    console.log(`User ${socket.id} joined room: ${roomId}`);
+    console.log(`User ${socket.id} joined room: ${roomId}`, 'Total in room:', io.sockets.adapter.rooms.get(roomId)?.size || 0);
     
     // Send existing files to the new user
     if (roomData.has(roomId)) {
@@ -72,6 +77,14 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
+
+  socket.on('error', (error) => {
+    console.error('Socket error:', error);
+  });
+});
+
+io.engine.on('connection_error', (err) => {
+  console.error('Connection error:', err);
 });
 
 server.listen(PORT, () => {
