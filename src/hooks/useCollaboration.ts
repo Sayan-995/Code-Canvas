@@ -4,7 +4,16 @@ import { WebsocketProvider } from 'y-websocket';
 import { useFileStore, Drawing } from '../store/useFileStore';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
-const WS_URL = BACKEND_URL.replace('http://', 'ws://').replace('https://', 'wss://');
+// Convert HTTP/HTTPS to WS/WSS for WebSocket connections
+const getWSURL = () => {
+  if (BACKEND_URL.startsWith('https://')) {
+    return BACKEND_URL.replace('https://', 'wss://');
+  } else if (BACKEND_URL.startsWith('http://')) {
+    return BACKEND_URL.replace('http://', 'ws://');
+  }
+  return BACKEND_URL;
+};
+const WS_URL = getWSURL();
 
 export const useCollaboration = (roomId: string | null) => {
   const { setDrawings } = useFileStore();
