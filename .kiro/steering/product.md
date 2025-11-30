@@ -1,4 +1,4 @@
-# Code Canvas Clone
+# Code Canvas
 
 A React + TypeScript application that visualizes code files as floating nodes on an infinite canvas.
 

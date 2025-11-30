@@ -1,4 +1,8 @@
-require('dotenv').config();
+try {
+  require('dotenv').config();
+} catch (e) {
+  // dotenv is optional, only needed for local development
+}
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
