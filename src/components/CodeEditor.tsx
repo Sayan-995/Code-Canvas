@@ -18,7 +18,8 @@ interface Conflict {
   remote: string;
 }
 
-const socket = io('http://localhost:3001');
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const socket = io(BACKEND_URL);
 
 export function CodeEditor() {
   const { files, setFiles, updateFileContent, githubContext, markAllAsSynced, setGitHubContext, clearFiles } = useFileStore();

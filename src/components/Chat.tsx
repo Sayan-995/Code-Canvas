@@ -14,7 +14,8 @@ interface ChatProps {
   onClose: () => void;
 }
 
-const socket: Socket = io('http://localhost:3001');
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const socket: Socket = io(BACKEND_URL);
 
 export const Chat: React.FC<ChatProps> = ({ roomId, username = 'User', onClose }) => {
   const [currentMessage, setCurrentMessage] = useState('');
