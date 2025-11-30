@@ -4,7 +4,12 @@
 
 Built for developers who think visually, Code Canvas combines real-time collaboration, AI-powered organization, and AST-based analysis to help you understand complex systems faster.
 
-![Code Canvas Demo](https://via.placeholder.com/800x400?text=Code+Canvas+Preview) *(Replace with actual screenshot)*
+<img width="1355" height="757" alt="image" src="https://github.com/user-attachments/assets/077f1420-eaf0-4f82-8f67-0bbbcf1ce6c8" />
+
+<img width="1020" height="735" alt="image" src="https://github.com/user-attachments/assets/43cde2a0-7108-4a21-a0c7-1b51d2079a71" />
+
+<img width="1901" height="847" alt="image" src="https://github.com/user-attachments/assets/9846cc4b-db90-4285-9340-5541ae83ad01" />
+
 
 ## 🚀 Features
 
@@ -95,10 +100,6 @@ Built for developers who think visually, Code Canvas combines real-time collabor
 
 3.  Open `http://localhost:5173` in your browser.
 
-## 🌍 Deployment
-
-- **Frontend**: Deployed on [Vercel](https://vercel.com).
-- **Backend**: Deployed on [Railway](https://railway.app) (or Render) for WebSocket support.
 
 ## 📄 License
 
