@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "signaling": "y-webrtc-signaling"
+    "signaling": "y-webrtc-signaling",
+    "postinstall": "npm install --prefix backend",
+    "start": "node backend/server.js"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
