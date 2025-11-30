@@ -35,6 +35,8 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://kiro-two.vercel.app';
+
 const io = new Server(server, {
   cors: {
     origin: "*",
