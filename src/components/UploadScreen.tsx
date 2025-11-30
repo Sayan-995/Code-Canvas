@@ -167,14 +167,13 @@ export const UploadScreen: React.FC = () => {
     }
   };
 
-  const handleGithubImport = async () => {
-    if (!repoUrl) return;
+  const importFromUrl = async (url: string) => {
     setLoading(true);
     setTransitionStage('loading');
     setError('');
 
     try {
-      const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+      const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
       if (!match) throw new Error('Invalid GitHub URL');
       
       const owner = match[1];
@@ -221,6 +220,15 @@ export const UploadScreen: React.FC = () => {
       setLoading(false);
       setTransitionStage('idle');
     }
+  };
+
+  const handleGithubImport = () => {
+    if (!repoUrl) return;
+    importFromUrl(repoUrl);
+  };
+
+  const handleSampleRepo = () => {
+    importFromUrl('https://github.com/samiran634/sample_repo');
   };
 
 
@@ -378,6 +386,17 @@ export const UploadScreen: React.FC = () => {
             >
               Import Repository
             </button>
+            
+            <div className="mt-2 text-center">
+                <span className="text-gray-400 text-sm mr-2">Wanna try out?</span>
+                <button
+                    onClick={handleSampleRepo}
+                    disabled={loading}
+                    className="text-purple-400 hover:text-purple-300 text-sm font-medium hover:underline transition-colors disabled:opacity-50"
+                >
+                    Use Sample Repo
+                </button>
+            </div>
           </div>
         </div>
       </div>

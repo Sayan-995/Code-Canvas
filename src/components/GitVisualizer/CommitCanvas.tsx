@@ -141,7 +141,7 @@ const CommitCanvasContent: React.FC<CommitCanvasProps> = ({ files, highlightedFi
     const maxDelay = Math.max(...displayFiles.map((f) => f.animationDelay || 0), 0);
     setTimeout(
       () => {
-        fitView({ padding: 0.2, duration: 800 }); // Slower, smoother fit
+        fitView({ padding: 0.2, duration: 500 }); // Faster fit
       },
       maxDelay + 300
     );
@@ -152,7 +152,7 @@ const CommitCanvasContent: React.FC<CommitCanvasProps> = ({ files, highlightedFi
     if (highlightedFile) {
       const node = nodes.find((n) => n.id === highlightedFile);
       if (node) {
-        setCenter(node.position.x + 150, node.position.y + 100, { duration: 600, zoom: 1.2 });
+        setCenter(node.position.x + 150, node.position.y + 100, { duration: 400, zoom: 1.2 });
       }
     }
   }, [highlightedFile, nodes, setCenter]);

@@ -49,6 +49,7 @@ export const GitVisualizer: React.FC<GitVisualizerProps> = ({
       try {
         const history = await fetchCommitHistory(owner, repo, token, 50);
         setCommits(history);
+        setIsPlaying(true); // Auto-start playing
       } catch (e: any) {
         setError(e.message || 'Failed to fetch commit history');
       } finally {
@@ -63,12 +64,12 @@ export const GitVisualizer: React.FC<GitVisualizerProps> = ({
     };
   }, [owner, repo, token]);
 
-  // Auto-play logic - base interval is 3500ms (slower default)
+  // Auto-play logic - base interval is 3000ms
   useEffect(() => {
     if (isPlaying) {
       playIntervalRef.current = setInterval(() => {
         nextCommit();
-      }, 3500 / playSpeed);
+      }, 3000 / playSpeed);
     } else {
       if (playIntervalRef.current) {
         clearInterval(playIntervalRef.current);

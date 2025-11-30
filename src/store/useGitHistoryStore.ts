@@ -164,7 +164,7 @@ export const useGitHistoryStore = create<GitHistoryStore>((set, get) => ({
           path,
           status,
           patch: isChanged ? patchInCurrentCommit.get(path) : undefined,
-          animationDelay: isChanged ? changedIndex++ * 80 : 0, // 80ms stagger
+          animationDelay: isChanged ? changedIndex++ * 40 : 0, // 40ms stagger
         });
       } else if (state === 'deleted' && isChanged) {
         // Show deleted files only in the commit they were deleted
@@ -172,7 +172,7 @@ export const useGitHistoryStore = create<GitHistoryStore>((set, get) => ({
           path,
           status: 'deleted',
           patch: patchInCurrentCommit.get(path),
-          animationDelay: changedIndex++ * 80,
+          animationDelay: changedIndex++ * 40,
         });
       }
     });
