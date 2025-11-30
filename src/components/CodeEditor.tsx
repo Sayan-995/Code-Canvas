@@ -20,6 +20,7 @@ interface Conflict {
 
 const getSocket = () => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  console.log('CodeEditor connecting to socket at:', backendUrl);
   return io(backendUrl);
 };
 

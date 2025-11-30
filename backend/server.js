@@ -12,7 +12,9 @@ const WebSocket = require('ws');
 const { setupWSConnection } = require('./y-utils');
 
 const app = express();
-app.use(cors());
+
+// Allow ALL origins
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' })); // Enable JSON body parsing with large limit
 
 const server = http.createServer(app);
@@ -33,18 +35,10 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://kiro-two.vercel.app';
-
 const io = new Server(server, {
   cors: {
-    origin: [
-      FRONTEND_URL, 
-      'http://localhost:3000', 
-      'http://localhost:5173',
-      /^https:\/\/.*\.vercel\.app$/
-    ],
-    methods: ["GET", "POST"],
-    credentials: true
+    origin: "*",
+    methods: ["GET", "POST"]
   },
   path: '/socket.io',
   transports: ['websocket', 'polling']

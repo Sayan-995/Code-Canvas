@@ -16,6 +16,7 @@ interface ChatProps {
 
 const getSocket = () => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  console.log('Chat connecting to socket at:', backendUrl);
   return io(backendUrl);
 };
 
