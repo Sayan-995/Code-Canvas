@@ -12,7 +12,7 @@ export interface FunctionSummary {
 const summaryCache = new Map<string, FunctionSummary[]>();
 
 export const summarizeFunctions = async (code: string, filePath: string): Promise<FunctionSummary[]> => {
-  // Check cache first
+  // Check cache 
   const cacheKey = `${filePath}:${code.length}`;
   if (summaryCache.has(cacheKey)) {
     return summaryCache.get(cacheKey)!;
