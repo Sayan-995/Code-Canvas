@@ -27,8 +27,13 @@ wss.on('connection', (ws, req) => {
 });
 
 server.on('upgrade', (request, socket, head) => {
+  // IMPORTANT: Ignore Socket.IO requests here, let Socket.IO handle them
+  if (request.url.startsWith('/socket.io/')) {
+    return;
+  }
+
   // Handle Yjs WebSocket connections
-  if (request.url.startsWith('/')) { // You might want to scope this to a specific path like /yjs
+  if (request.url.startsWith('/')) { 
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit('connection', ws, request);
     });
@@ -51,11 +56,8 @@ const PORT = process.env.PORT || 3001;
 const roomData = new Map(); // roomId -> { files: [] }
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id, 'from:', socket.handshake.headers.origin);
-
   socket.on('join_room', (roomId) => {
     socket.join(roomId);
-    console.log(`User ${socket.id} joined room: ${roomId}`, 'Total in room:', io.sockets.adapter.rooms.get(roomId)?.size || 0);
     
     // Send existing files to the new user
     if (roomData.has(roomId)) {
@@ -75,16 +77,16 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    // User disconnected
   });
 
   socket.on('error', (error) => {
-    console.error('Socket error:', error);
+    // Socket error
   });
 });
 
 io.engine.on('connection_error', (err) => {
-  console.error('Connection error:', err);
+  // Connection error
 });
 
 server.listen(PORT, () => {
