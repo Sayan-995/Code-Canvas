@@ -1,5 +1,5 @@
 
-const GEMINI_API_KEY = 'AIzaSyA2u56h76HNeokU4g9QjhYv65HoXqtW0ew';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 export const explainCode = async (code: string, context: 'file' | 'function' | 'endpoint', name?: string) => {
